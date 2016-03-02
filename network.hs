@@ -8,7 +8,7 @@ import Control.Monad.Error
 main = client' 1357
 
 client' :: Int -> IO ()
-client' = client "sysprak.priv.lab.nm.ifi.lmu.de"
+client' = client "localhost"
 
 client :: String -> Int -> IO ()
 client host port = withSocketsDo $ do
