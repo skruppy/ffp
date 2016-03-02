@@ -48,15 +48,3 @@ headByTrial (x:xs) =
                                             Right _ -> do   sClose sock
                                                             return x -- return the first good address
                                                             
-
-
-
-
---dummycode to be replaced with retrieving and writing to mvars.
---msgSender :: Socket -> IO ()
---msgSender sock = do
---  rMsg <- recv sock 2048
---  putStrLn rMsg
---  msg <- getLine
---  send sock msg
---  if msg == BS8.pack "q" then putStrLn "Disconnected!" else msgSender sock
