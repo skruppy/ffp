@@ -1,18 +1,8 @@
--- file: ch27/syslogtcpclient.hs
 module Sm where
 
-import Data.Bits
-import Network.Socket
-import Network.BSD
-import Network.Simple.TCP
-import Data.List
-import System.IO
-import qualified Network.Socket                 as NS
-import           Control.Monad.IO.Class         (MonadIO(liftIO))
-import qualified Control.Exception              as E
-import Control.Monad.Error
-import Text.Regex.Posix
 import Data.Array
+import Data.List
+import Text.Regex.Posix
 
 
 
@@ -64,51 +54,7 @@ main = do
 -}
 
 ai _ _ = "test"
-testServerData = [
-  "+ MNM Gameserver v1.0 accepting connections",-- VERSION 1.0
-  "+ Client version accepted - please send Game-ID to join", -- ID ...
-  "+ PLAYING Reversi",
-  "+ The name of the game", -- PLAYER ...
-  "+ TOTAL 2",
-  "+ 1 Player 1 1",
-  "+ ENDPLAYERS",
-  "+ WAIT", -- OKWAIT
-  "+ WAIT", -- OKWAIT
-  "+ MOVE 3000",
-  "+ FIELD 12,12",
-  "+ 12 * * * * * * * * * * * *",
-  "+ 11 * * * * * * * * * * * *",
-  "+ 10 * * * * * * * * * * * *",
-  "+ 9 * * * * * * * * * * * *",
-  "+ 8 * * * * * * * * * * * *",
-  "+ 7 * * * * * W B * * * * *",
-  "+ 6 * * * * * B W * * * * *",
-  "+ 5 * * * * * * * * * * * *",
-  "+ 4 * * * * * * * * * * * *",
-  "+ 3 * * * * * * * * * * * *",
-  "+ 2 * * * * * * * * * * * *",
-  "+ 1 * * * * * * * * * * * *",
-  "+ ENDFIELD", -- THINKING
-  "+ OKTHINK", -- PLAY ...
-  "+ MOVEOK",
-  "+ WAIT", -- OKWAIT
-  "+ WAIT", -- OKWAIT
-  "+ GAMEOVER 0 Your Name",
-  "+ FIELD 12,12",
-  "+ 12 * * * * * * * * * * * *",
-  "+ 11 * * * * * * * * * * * *",
-  "+ 10 * * * * * * * * * * * *",
-  "+ 9 * * * * * * * * * * * *",
-  "+ 8 * * * * * * * * * * * *",
-  "+ 7 * * * * * W B * * * * *",
-  "+ 6 * * * * * B W * * * * *",
-  "+ 5 * * * * * * * * * * * *",
-  "+ 4 * * * * * * * * * * * *",
-  "+ 3 * * * * * * * * * * * *",
-  "+ 2 * * * * * * * * * * * *",
-  "+ 1 * * * * * * * * * * * *",
-  "+ ENDFIELD",
-  "+ QUIT"]
+
 
 data State = ErrorState
     | StartState
@@ -239,13 +185,13 @@ parseInput (FieldEndState players time x y field) cfg input =
             otherwise -> (QuitState, [])
     else (ErrorState, [])
     where
-        f = listArray ((1,1), (x,y)) $ concat field
+        f = listArray ((1,1), (x,y)) (concat $ transpose field)
 
 
 parseInput (ThinkingState players time field) cfg input =
     if input == "+ OKTHINK"
        then (MoveState players, ["PLAY "++move])
-       else (QuitState, [])
+       else (ErrorState, [])
     where
         move = ai time field
 
@@ -253,7 +199,7 @@ parseInput (ThinkingState players time field) cfg input =
 parseInput (MoveState players) cfg input =
     if input == "+ MOVEOK"
        then (IdleState players, [])
-       else (QuitState, [])
+       else (ErrorState, [])
 
 
 parseInput QuitState cfg input =
@@ -262,21 +208,18 @@ parseInput QuitState cfg input =
        else (ErrorState, [])
 
 
-parseInput ErrorState cfg input = error "No input line should ever be parsed in the error state"
+parseInput EndState cfg input = error ("No input line should ever be parsed in the end state, but we still got \""++input++"\"")
+
+
+parseInput ErrorState cfg input = error ("No input line should ever be parsed in the error state, but we still got \""++input++"\"")
 
 
 smStep (input:inputs) oldState cfg =
-    if newState /= ErrorState then smStep inputs newState cfg else newState
+    if (newState /= ErrorState) && (newState /= EndState) then smStep inputs newState cfg else newState
     where
         (newState, toSend) = parseInput oldState cfg input
+        
+smStep nil oldState cfg = ErrorState
 
 
-sm inputs cfg = smStep inputs StartState cfg
--- 
--- main =
---     sm (net cfg) cfg
---     where
---         cfg = parseCfg args
-
-
-
+sm inputs cfg = (smStep inputs StartState cfg) == EndState
