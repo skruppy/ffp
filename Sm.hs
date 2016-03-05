@@ -1,67 +1,30 @@
-module Sm where
+module Sm (StepResult(..),Cfg(..),smCreate,smStep) where
 
 import Data.Array
 import Data.List
 import Text.Regex.Posix
 
 
-
-{-
--- https://hackage.haskell.org/package/network-simple-0.4.0.4/docs/src/Network-Simple-TCP.html#connect
-connectSock2 ::  MonadIO m => NS.HostName -> NS.ServiceName -> Maybe (m (NS.Socket))
-connectSock2 host port =
-    findConnection $
-    liftIO $
-    NS.getAddrInfo (Just hints) (Just host) (Just port)
-    where
-        hints = NS.defaultHints { NS.addrFlags = [NS.AI_ADDRCONFIG], NS.addrSocketType = NS.Stream }
-        
-        -- https://hackage.haskell.org/package/network-simple-0.4.0.4/docs/src/Network-Simple-TCP.html#newSocket
-        newSocket :: NS.AddrInfo -> NS.Socket
-        newSocket ai = NS.socket (NS.addrFamily ai) (NS.addrSocketType ai) (NS.addrProtocol ai)
-        
-        tryToConnect :: NS.AddrInfo -> NS.Socket
-        tryToConnect ai = do
-            E.bracketOnError
-                -- At the beginning: IO a
-                (newSocket ai)
-                
-                -- On error: (a -> IO b)
-                (closeSock)
-                
-                -- "Main" operation: (a -> IO c)
-                (\s -> do
-                    NS.connect s (NS.addrAddress ai)
-                    return s)
-        
-        findConnection :: [NS.AddrInfo] -> Maybe (NS.Socket)
-        findConnection nil = Nothing
-        findConnection (ai:ais) = Just (tryToConnect ai) `E.catch` (findConnection ais)
-
-
---    liftIO $
-main = do
-	connectSock2 "foo.lan" "http"
-
--- syslog :: SyslogHandle -> Facility -> Priority -> String -> IO ()
--- syslog syslogh fac pri msg =
---     do hPutStrLn (slHandle syslogh) sendmsg
---        -- Make sure that we send data immediately
---        hFlush (slHandle syslogh)
---     where code = makeCode fac pri
---           sendmsg = "<" ++ show code ++ ">" ++ (slProgram syslogh) ++
---                     ": " ++ msg
--}
-
 ai _ _ = "test"
 
+data StepResult
+    = SmOk QuallifiedState [String]
+    | SmEnd
+    | SmError String
+      deriving (Eq, Show)
 
-data State = ErrorState
+data QuallifiedState
+    = QuallifiedState State Cfg
+      deriving (Eq, Show)
+
+data State
+    = ErrorState
     | StartState
     | VersionState
     | GameKindState
     | GameNameState
-    | PlayerStartState
+    | PlayerNameState
+    | PlayerStartState        Int PlayerItem
     | PlayerLineState  (Array Int PlayerItem) Int
     | PlayerEndState   (Array Int PlayerItem)
     | IdleState        (Array Int PlayerItem)
@@ -71,15 +34,19 @@ data State = ErrorState
     | ThinkingState    (Array Int PlayerItem)        Int  (Array (Int, Int) String)
     | MoveState        (Array Int PlayerItem)
     | QuitState
-    | EndState deriving (Eq, Show)
+    | EndState
+      deriving (Eq, Show)
 
-data Cfg =
-    Cfg { gameId :: String,
-          player :: Maybe Int} deriving (Eq, Show)
+data Cfg = Cfg
+    { gameId :: String
+    , player :: Maybe Int
+    } deriving (Eq, Show)
 
-data PlayerItem =
-    PlayerItem { playerName :: Maybe String,
-                 isReady :: Bool} deriving (Eq, Show)
+data PlayerItem = PlayerItem
+    { playerName :: Maybe String
+    , isReady    :: Bool
+    } deriving (Eq, Show)
+
 
 parseInput StartState cfg input =
     if major == Just 1
@@ -107,13 +74,21 @@ parseInput GameKindState cfg input =
 
 parseInput GameNameState cfg input =
     if length xs == 1
-       then (PlayerStartState, [maybe "PLAYER" (\nr -> "PLAYER "++(show nr)) (player cfg)])
+       then (PlayerNameState, [maybe "PLAYER" (\nr -> "PLAYER "++(show nr)) (player cfg)])
        else (ErrorState, [])
     where
         (_, _, _, xs) = (input =~ "^\\+ (.+)$" :: (String, String, String, [String]))
 
 
-parseInput PlayerStartState cfg input =
+parseInput PlayerNameState cfg input =
+    if length xs == 2
+       then let [n, name] = xs in (PlayerStartState (read n) (PlayerItem {playerName = Just name, isReady = True}), [])
+       else (ErrorState, [])
+    where
+        (_, _, _, xs) = (input =~ "^\\+ YOU ([0-9])+ (.+)$" :: (String, String, String, [String]))
+
+
+parseInput (PlayerStartState myNr myName) cfg input =
     if length xs == 1
        then let n = (read $ head xs) - 1 in (
            PlayerLineState
@@ -214,12 +189,13 @@ parseInput EndState cfg input = error ("No input line should ever be parsed in t
 parseInput ErrorState cfg input = error ("No input line should ever be parsed in the error state, but we still got \""++input++"\"")
 
 
-smStep (input:inputs) oldState cfg =
-    if (newState /= ErrorState) && (newState /= EndState) then smStep inputs newState cfg else newState
+smCreate :: Cfg -> QuallifiedState
+smCreate cfg = QuallifiedState StartState cfg
+
+
+smStep (QuallifiedState s c) input = case s' of
+    ErrorState -> SmError "Failed"
+    EndState   -> SmEnd
+    otherwise  -> SmOk (QuallifiedState s' c) output
     where
-        (newState, toSend) = parseInput oldState cfg input
-        
-smStep nil oldState cfg = ErrorState
-
-
-sm inputs cfg = (smStep inputs StartState cfg) == EndState
+        (s', output) = parseInput s c input

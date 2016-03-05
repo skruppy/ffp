@@ -1,3 +1,5 @@
+module Net where
+
 import Network.Socket as NS
 import Control.Exception
 import System.IO
@@ -67,20 +69,6 @@ netConverse hdl (line:remaining) = do
     netConverse hdl remaining
 
 
-main :: IO ()
-main = do
-    -- Get socket
-    socket <- netConnect "sysprak.onmars.eu" "1357"
-    
-    -- Convert socket to unbuffered handle
-    hdl    <- socketToHandle socket ReadWriteMode
-    hSetBuffering hdl NoBuffering
-    
-    netConverse hdl []
-    netConverse hdl ["VERSION 1.0"]
-    netConverse hdl ["ID asdf12364"]
-    
-    -- So close!
-    hClose hdl
+
 
 
