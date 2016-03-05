@@ -24,15 +24,15 @@ data State
     | GameKindState
     | GameNameState
     | PlayerNameState
-    | PlayerStartState        Int PlayerItem
-    | PlayerLineState  (Array Int PlayerItem) Int
-    | PlayerEndState   (Array Int PlayerItem)
-    | IdleState        (Array Int PlayerItem)
-    | FieldStartState  (Array Int PlayerItem) (Maybe Int)
-    | FieldLineState   (Array Int PlayerItem) (Maybe Int) Int Int Int [[String]]
-    | FieldEndState    (Array Int PlayerItem) (Maybe Int) Int Int [[String]]
-    | ThinkingState    (Array Int PlayerItem)        Int  (Array (Int, Int) String)
-    | MoveState        (Array Int PlayerItem)
+    | PlayerStartState        Int       PlayerItem
+    | PlayerLineState  (Array Int (Maybe PlayerItem)) Int
+    | PlayerEndState   (Array Int (Maybe PlayerItem))
+    | IdleState        (Array Int (Maybe PlayerItem))
+    | FieldStartState  (Array Int (Maybe PlayerItem)) (Maybe Int)
+    | FieldLineState   (Array Int (Maybe PlayerItem)) (Maybe Int) Int Int Int [[String]]
+    | FieldEndState    (Array Int (Maybe PlayerItem)) (Maybe Int) Int Int [[String]]
+    | ThinkingState    (Array Int (Maybe PlayerItem))        Int  (Array (Int, Int) String)
+    | MoveState        (Array Int (Maybe PlayerItem))
     | QuitState
     | EndState
       deriving (Eq, Show)
@@ -43,8 +43,9 @@ data Cfg = Cfg
     } deriving (Eq, Show)
 
 data PlayerItem = PlayerItem
-    { playerName :: Maybe String
+    { playerName :: String
     , isReady    :: Bool
+    , itsMe      :: Bool
     } deriving (Eq, Show)
 
 
@@ -82,7 +83,7 @@ parseInput GameNameState cfg input =
 
 parseInput PlayerNameState cfg input =
     if length xs == 2
-       then let [n, name] = xs in (PlayerStartState (read n) (PlayerItem {playerName = Just name, isReady = True}), [])
+       then let [n, name] = xs in (PlayerStartState (read n) (PlayerItem {playerName = name, isReady = True, itsMe = True}), [])
        else (ErrorState, [])
     where
         (_, _, _, xs) = (input =~ "^\\+ YOU ([0-9])+ (.+)$" :: (String, String, String, [String]))
@@ -92,7 +93,7 @@ parseInput (PlayerStartState myNr myName) cfg input =
     if length xs == 1
        then let n = (read $ head xs) - 1 in (
            PlayerLineState
-           ( listArray (0, n)  (replicate (n+1) (PlayerItem {playerName = Nothing, isReady = True})) )
+           ( listArray (0, n)  [if cnt == myNr then Just myName else Nothing | cnt <- [0..n]] )
            (n-1), [])
        else (ErrorState, [])
     where
@@ -101,8 +102,8 @@ parseInput (PlayerStartState myNr myName) cfg input =
 
 parseInput (PlayerLineState players playerCnt) cfg input =
     case playerFromList xs of
-         Just (nr, _)      | nr > (snd $ bounds players) -> (ErrorState, [])
-         Just (nr, _)      | (playerName (players!nr)) /= Nothing -> (ErrorState, [])
+         Just (nr, _) | nr > (snd $ bounds players) -> (ErrorState, [])
+         Just (nr, _) | (players!nr) /= Nothing -> (ErrorState, [])
          Just (nr, player) -> (
              if playerCnt  > 0
                 then PlayerLineState (players // [(nr, player)]) (playerCnt-1)
@@ -111,7 +112,7 @@ parseInput (PlayerLineState players playerCnt) cfg input =
          otherwise -> (ErrorState, [])
     where
         (_, _, _, xs) = (input =~ "^\\+ ([0-9]+) (.+) (0|1)$" :: (String, String, String, [String]))
-        playerFromList (nr:name:rdy:[]) = Just ((read nr), PlayerItem {playerName = Just name, isReady = (rdy == "1")})
+        playerFromList [nr, name, rdy] = Just ((read nr), Just $ PlayerItem {playerName = name, isReady = (rdy == "1"), itsMe = False})
         playerFromList _                = Nothing
 
 
@@ -143,7 +144,7 @@ parseInput (FieldStartState players time) cfg input =
 
 parseInput (FieldLineState players time x y curY field) cfg input =
     case xs of
-        n:s:[] -> let elements = words s in
+        [n, s] -> let elements = words s in
             if length elements /= x then (ErrorState, []) else
             if read n /= curY then (ErrorState, []) else
             if curY > 1 then (FieldLineState players time x y (curY-1) (elements:field), []) else
@@ -193,9 +194,8 @@ smCreate :: Cfg -> QuallifiedState
 smCreate cfg = QuallifiedState StartState cfg
 
 
-smStep (QuallifiedState s c) input = case s' of
-    ErrorState -> SmError "Failed"
-    EndState   -> SmEnd
-    otherwise  -> SmOk (QuallifiedState s' c) output
-    where
-        (s', output) = parseInput s c input
+smStep (QuallifiedState s c) input =
+    case parseInput s c input of
+        (ErrorState, _) -> SmError "Failed"
+        (EndState, _)   -> SmEnd
+        (s', output)    -> SmOk (QuallifiedState s' c) output
