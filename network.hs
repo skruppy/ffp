@@ -1,14 +1,13 @@
 import Network.Socket as NS
 import Control.Exception
-import Control.Monad.Error
--- import Sm
 import System.IO
 import System.Console.ANSI
 
 
 
+netKnockKnock :: [AddrInfo] -> IO Socket
 netKnockKnock [] = do
-    putStrLn "Noooose, I can't connect to the server. The washing machine ate all my socks"
+    putStrLn "Oh noes, I can't connect to the server. The washing machine ate all my sock(et)s"
     error "No valid address to connect to"
 
 netKnockKnock (x:xs) = do
@@ -25,16 +24,19 @@ netKnockKnock (x:xs) = do
             return sock
 
 
+--            /String     /String
+netConnect :: HostName -> ServiceName -> IO Socket
 netConnect host port = withSocketsDo $ do
-    addrInfo <- getAddrInfo Nothing (Just host) (Just port)
+    addrInfo <- getAddrInfo (Just hints) (Just host) (Just port)
     sock     <- netKnockKnock addrInfo
     return sock
     where
         hints = NS.defaultHints {
-            NS.addrFlags      = [NS.AI_ADDRCONFIG],
+            NS.addrFlags      = [AI_ADDRCONFIG,AI_V4MAPPED],
             NS.addrSocketType = NS.Stream }
 
 
+netListen :: Handle -> IO String
 netListen hdl = do
     msg <- hGetLine hdl
     putStr "S: "
@@ -46,6 +48,7 @@ netListen hdl = do
     return msg
 
 
+netSpeak :: Handle -> String -> IO ()
 netSpeak hdl line = do
     putStr "C: "
     
@@ -56,6 +59,7 @@ netSpeak hdl line = do
     hPutStrLn hdl line
 
 
+netConverse :: Handle -> [String] -> IO String
 netConverse hdl [] = netListen hdl
 
 netConverse hdl (line:remaining) = do
@@ -63,6 +67,7 @@ netConverse hdl (line:remaining) = do
     netConverse hdl remaining
 
 
+main :: IO ()
 main = do
     -- Get socket
     socket <- netConnect "sysprak.onmars.eu" "1357"
