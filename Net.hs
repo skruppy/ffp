@@ -1,4 +1,4 @@
-module Net where
+module Net(Net.connect,Net.listen,speak,converse) where
 
 import Network.Socket as NS
 import Control.Exception
@@ -6,31 +6,31 @@ import System.IO
 import System.Console.ANSI
 
 
-
-netKnockKnock :: [AddrInfo] -> IO Socket
-netKnockKnock [] = do
+-- *Knock Knock* "Who's there?" "Denial of Service Attack" "Den...?"
+knockKnock :: [AddrInfo] -> IO Socket
+knockKnock [] = do
     putStrLn "Oh noes, I can't connect to the server. The washing machine ate all my sock(et)s"
     error "No valid address to connect to"
 
-netKnockKnock (x:xs) = do
+knockKnock (x:xs) = do
     putStr $ "Connecting to "++(show $ addrAddress x)
     sock <- socket (addrFamily x) Stream defaultProtocol
-    res  <- try $ connect sock (addrAddress x) :: IO (Either SomeException ())
+    res  <- try $ NS.connect sock (addrAddress x) :: IO (Either SomeException ())
     case res of
         Left _ -> do
             putStrLn " ✘"
             sClose sock
-            netKnockKnock xs
+            knockKnock xs
         Right _ -> do
             putStrLn " ✔"
             return sock
 
 
---            /String     /String
-netConnect :: HostName -> ServiceName -> IO Socket
-netConnect host port = withSocketsDo $ do
+--         /String     /String
+connect :: HostName -> ServiceName -> IO Socket
+connect host port = withSocketsDo $ do
     addrInfo <- getAddrInfo (Just hints) (Just host) (Just port)
-    sock     <- netKnockKnock addrInfo
+    sock     <- knockKnock addrInfo
     return sock
     where
         hints = NS.defaultHints {
@@ -38,8 +38,8 @@ netConnect host port = withSocketsDo $ do
             NS.addrSocketType = NS.Stream }
 
 
-netListen :: Handle -> IO String
-netListen hdl = do
+listen :: Handle -> IO String
+listen hdl = do
     msg <- hGetLine hdl
     putStr "S: "
     
@@ -50,8 +50,8 @@ netListen hdl = do
     return msg
 
 
-netSpeak :: Handle -> String -> IO ()
-netSpeak hdl line = do
+speak :: Handle -> String -> IO ()
+speak hdl line = do
     putStr "C: "
     
     setSGR [SetColor Foreground Vivid Cyan, SetConsoleIntensity BoldIntensity]
@@ -61,12 +61,12 @@ netSpeak hdl line = do
     hPutStrLn hdl line
 
 
-netConverse :: Handle -> [String] -> IO String
-netConverse hdl [] = netListen hdl
+converse :: Handle -> [String] -> IO String
+converse hdl [] = Net.listen hdl
 
-netConverse hdl (line:remaining) = do
-    netSpeak hdl line
-    netConverse hdl remaining
+converse hdl (line:remaining) = do
+    speak hdl line
+    converse hdl remaining
 
 
 

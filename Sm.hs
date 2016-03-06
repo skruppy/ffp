@@ -5,17 +5,13 @@ import Data.List
 import Text.Regex.Posix
 
 
-ai _ _ = "test"
-
 data StepResult
     = SmOk QuallifiedState [String]
     | SmEnd
     | SmError String
-      deriving (Eq, Show)
 
 data QuallifiedState
     = QuallifiedState State Cfg
-      deriving (Eq, Show)
 
 data State
     = ErrorState
@@ -40,7 +36,8 @@ data State
 data Cfg = Cfg
     { gameId :: String
     , player :: Maybe Int
-    } deriving (Eq, Show)
+    , ai     :: Int -> ((Array (Int, Int) String) -> String)
+    }
 
 data PlayerItem = PlayerItem
     { playerName :: String
@@ -169,7 +166,7 @@ parseInput (ThinkingState players time field) cfg input =
        then (MoveState players, ["PLAY "++move])
        else (ErrorState, [])
     where
-        move = ai time field
+        move = ai cfg time field
 
 
 parseInput (MoveState players) cfg input =
