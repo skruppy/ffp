@@ -76,7 +76,7 @@ lookInDirectionFrom field pT (r,c) (dirRow, dirCol) = if ((field ! (r,c)) == ( 0
     where   checkNext nR nC = if ((nR <= ubR) && (nC <= ubC) && (nR >=lbR) && (nC >= lbC)) then True else False 
             countIt nR' nC' acc = if (checkNext nR' nC')            then 
                     if ((field ! (nR', nC')) == (0,"*"))            then 0      else
-                    if ((field ! (nR', nC')) == (1,pT)&& acc >0)    then acc    else
+                    if ((field ! (nR', nC')) == (1,pT))             then acc    else
                     countIt (nR'+dirRow) (nC'+dirCol) (acc +1)                  else 0 
                     
             ((lbR,lbC),(ubR, ubC)) = bounds field
