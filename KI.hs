@@ -2,7 +2,7 @@ import Data.Tree.Game_tree.Negascout as NS
 import Data.Tree.Game_tree.Game_tree 
 import Data.Array
 
-alphabet = ["ABCDEFGHIJKLMNOPQRSTUVWXYZ"];            
+alphabet = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];            
             
 --              Up   UpRight Right DownRight Down DownLeft Left   UpLeft
 directions = [(-1,0),(-1,1), (0,1),(1,1),    (1,0),(1,-1), (0,-1),(-1,-1)]
@@ -23,32 +23,14 @@ getNextMove field pC = getMoveFromRNode $ getNextRNode a searchdepth
     where a = (RNode (createWeightedArray pC field) pC pC Nothing)
             
 getNextRNode :: RNode -> Int -> RNode
-getNextRNode a i = res !! 2
+getNextRNode a i = res !! 1
     where (res, _) = alpha_beta_search a i
 
             
 getMoveFromRNode:: RNode -> String
-getMoveFromRNode (RNode _ _ _ (Just (x,y))) = (alphabet !! x) ++ show y
+getMoveFromRNode (RNode _ _ _ (Just (x,y))) = (alphabet !! (x-1)) ++ show y
 getMoveFromRNode (RNode _ _ _ Nothing) = ""
 
-
-
-
--- stuff for testing
-startfield = throwStuffOut "*****************************************************************WB**********BW*****************************************************************"
-
-startbounds :: ((Int,Int),(Int,Int))
-startbounds = ((1,1),(12,12))
-
-startarray = listArray startbounds startfield
-
-startNode = (RNode (createWeightedArray "W" startarray) "W" "W" Nothing)
-
-throwStuffOut :: [Char] -> [String]
-throwStuffOut [] = [[]]
-throwStuffOut (x:xs) = if (x == 'W' || x == 'B' || x == '*') then xlist : throwStuffOut xs else throwStuffOut xs
-    where xlist = x:[]
--- end stuff for testing
             
 instance Game_tree RNode where
                    
