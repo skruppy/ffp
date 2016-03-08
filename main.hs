@@ -4,6 +4,9 @@ import Network.Socket as NS
 import System.IO
 import Conf as C
 import Conf.Args as CA
+import Conf.Gui as CG
+import Data.String.Utils
+import System.Environment
 
 -- The name speaks for it self. Here you are looking at the beautiful main-l↺↺p.
 (↺) hdl (SmEnd)       = putStrLn ("OK")
