@@ -2,16 +2,35 @@ import Data.Tree.Game_tree.Negascout as NS
 import Data.Tree.Game_tree.Game_tree 
 import Data.Array
 
+alphabet = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];            
+            
+--              Up   UpRight Right DownRight Down DownLeft Left   UpLeft
+directions = [(-1,0),(-1,1), (0,1),(1,1),    (1,0),(1,-1), (0,-1),(-1,-1)]
+
+searchdepth = 5  
 
 data RNode = 
-    RNode { gamefield       :: (Array (Int, Int) (Int, String)),
+    RNode  {gamefield       :: (Array (Int, Int) (Int, String)),
             playerColour    :: String, -- playerNumber 0 => B; 1 => W
             playerTurn      :: String, --whose turn it is --> B/W
             lastMove        :: Maybe (Int,Int)
             } deriving (Eq, Show)
 
---              Up   UpRight Right DownRight Down DownLeft Left   UpLeft
-directions = [(-1,0),(-1,1), (0,1),(1,1),    (1,0),(1,-1), (0,-1),(-1,-1)]     
+          
+            
+getNextMove :: (Array (Int, Int) String) -> String -> String
+getNextMove field pC = getMoveFromRNode $ getNextRNode a searchdepth
+    where a = (RNode (createWeightedArray pC field) pC pC Nothing)
+            
+getNextRNode :: RNode -> Int -> RNode
+getNextRNode a i = res !! 1
+    where (res, _) = alpha_beta_search a i
+
+            
+getMoveFromRNode:: RNode -> String
+getMoveFromRNode (RNode _ _ _ (Just (x,y))) = (alphabet !! (x-1)) ++ show y
+getMoveFromRNode (RNode _ _ _ Nothing) = ""
+
             
 instance Game_tree RNode where
                    
@@ -36,9 +55,6 @@ makeElemList _ [] = []
 makeElemList pC ("*":xs) = (0,"*") : makeElemList pC xs
 makeElemList pC (x:xs) = if (pC == x) then (1,pC) : makeElemList pC xs else ((-1),notPC) : makeElemList pC xs
     where   notPC = if pC == "W" then "B" else "W"
-
-
-
 
 
 makeChildrenFromMoves :: [(Int,Int)] -> (Array (Int,Int) (Int,String)) -> String -> String -> [RNode]
