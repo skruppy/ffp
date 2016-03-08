@@ -2,71 +2,21 @@ import Sm as S
 import Net
 import Network.Socket as NS
 import System.IO
-import Options.Applicative
+import Conf as C
+import Conf.Args as CA
 
-
--- This definition is so boring, we had to add a joke:
--- Chuck Norris can write Haskell... in assembler.
-data Cfg = Cfg
-    { host   :: String
-    , port   :: String
-    , conf   :: String
-    , gameId :: String
-    , player :: Maybe Int
-    }
-
-
-argParseCfg :: Parser Main.Cfg
-argParseCfg = Main.Cfg <$> (
-        option str
-      $ long    "host"
-     <> short   's'
-     <> metavar "NAME"
-     <> help    "Gameserver hostname"
-     <> value   "sysprak.onmars.eu"
-      )
-    <*> (
-        option str
-      $ long    "port"
-     <> short   'p'
-     <> metavar "NAME/NUMBER"
-     <> help    "Gameserver port number or service name"
-     <> value   "1357"
-      )
-    <*> (
-        option str
-      $ long    "conf"
-     <> short   'c'
-     <> metavar "PATH"
-     <> help    "Read configuration from file"
-     <> value   "client.conf"
-      )
-    <*> (
-        argument str
-      $ metavar "GAMEID" -- "mSPb8GUCKxc"
-     <> help    "Game ID"
-      )
-    <*> (
-        optional $ argument auto
-      $ metavar "PLAYER"
-     <> help    "Player number (0, 1, ..)"
-      )
-
-
--- The name speaks for it self. Here you are looking at a beautiful main-loop ↺.
+-- The name speaks for it self. Here you are looking at the beautiful main-l↺↺p.
 (↺) hdl (SmEnd)       = putStrLn ("OK")
 (↺) hdl (SmError msg) = putStrLn ("FAILED: "++msg)
 (↺) hdl (SmOk s o)    = fmap (smStep s) (converse hdl o) >>= (↺) hdl
 
 
-main :: IO ()
-main = do
-    cfg <- execParser $ info
-        (helper <*> argParseCfg)
-        (fullDesc <> header "AI for the sysprak gameserver.")
-    
+play Nothing _ _ _ = putStrLn ("Missing hostname")
+play _ Nothing _ _ = putStrLn ("Missing port")
+play _ _ Nothing _ = putStrLn ("Missing game ID")
+play (Just host') (Just port') (Just gameId') player' = do
     -- Get socket
-    socket <- Net.connect (host cfg) (port cfg)
+    socket <- Net.connect host' port'
     
     -- Convert socket to unbuffered handle
     hdl    <- socketToHandle socket ReadWriteMode
@@ -74,8 +24,8 @@ main = do
     
     -- Main loop
     let state = smCreate $ S.Cfg {
-          S.gameId = Main.gameId cfg
-        , S.player = Main.player cfg
+          S.gameId = gameId'
+        , S.player = player'
         , S.ai     = \time -> \field -> "asd"
         }
     stepResult <- fmap (smStep state) (converse hdl [])
@@ -83,3 +33,18 @@ main = do
     
     -- So close!
     hClose hdl
+
+
+main :: IO ()
+main = do
+    -- Config from command line
+    argsCfg <- CA.getCfg
+    
+    progName <- getProgName
+    guiCfg <- if endswith "-gui" progName
+        then CG.getCfg
+        else return emptyCfg
+    
+    let cfg = mergeCfg [defaultCfg, argsCfg, guiCfg]
+    
+    play (C.host cfg) (C.port cfg) (C.gameId cfg) (C.player cfg)
