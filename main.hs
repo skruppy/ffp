@@ -45,9 +45,9 @@ main = do
     
     progName <- getProgName
     guiCfg <- if endswith "-gui" progName
-        then CG.getCfg
+        then let cfg = mergeCfg [argsCfg, defaultCfg] in CG.getCfg cfg
         else return emptyCfg
     
-    let cfg = mergeCfg [defaultCfg, argsCfg, guiCfg]
+    let cfg = mergeCfg [guiCfg, argsCfg, defaultCfg]
     
     play (C.host cfg) (C.port cfg) (C.gameId cfg) (C.player cfg)
