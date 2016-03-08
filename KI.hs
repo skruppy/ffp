@@ -2,16 +2,53 @@ import Data.Tree.Game_tree.Negascout as NS
 import Data.Tree.Game_tree.Game_tree 
 import Data.Array
 
+alphabet = ["ABCDEFGHIJKLMNOPQRSTUVWXYZ"];            
+            
+--              Up   UpRight Right DownRight Down DownLeft Left   UpLeft
+directions = [(-1,0),(-1,1), (0,1),(1,1),    (1,0),(1,-1), (0,-1),(-1,-1)]
+
+searchdepth = 5  
 
 data RNode = 
-    RNode { gamefield       :: (Array (Int, Int) (Int, String)),
+    RNode  {gamefield       :: (Array (Int, Int) (Int, String)),
             playerColour    :: String, -- playerNumber 0 => B; 1 => W
             playerTurn      :: String, --whose turn it is --> B/W
             lastMove        :: Maybe (Int,Int)
             } deriving (Eq, Show)
 
---              Up   UpRight Right DownRight Down DownLeft Left   UpLeft
-directions = [(-1,0),(-1,1), (0,1),(1,1),    (1,0),(1,-1), (0,-1),(-1,-1)]     
+          
+            
+getNextMove :: (Array (Int, Int) String) -> String -> String
+getNextMove field pC = getMoveFromRNode $ getNextRNode a searchdepth
+    where a = (RNode (createWeightedArray pC field) pC pC Nothing)
+            
+getNextRNode :: RNode -> Int -> RNode
+getNextRNode a i = res !! 2
+    where (res, _) = alpha_beta_search a i
+
+            
+getMoveFromRNode:: RNode -> String
+getMoveFromRNode (RNode _ _ _ (Just (x,y))) = (alphabet !! x) ++ show y
+getMoveFromRNode (RNode _ _ _ Nothing) = ""
+
+
+
+
+-- stuff for testing
+startfield = throwStuffOut "*****************************************************************WB**********BW*****************************************************************"
+
+startbounds :: ((Int,Int),(Int,Int))
+startbounds = ((1,1),(12,12))
+
+startarray = listArray startbounds startfield
+
+startNode = (RNode (createWeightedArray "W" startarray) "W" "W" Nothing)
+
+throwStuffOut :: [Char] -> [String]
+throwStuffOut [] = [[]]
+throwStuffOut (x:xs) = if (x == 'W' || x == 'B' || x == '*') then xlist : throwStuffOut xs else throwStuffOut xs
+    where xlist = x:[]
+-- end stuff for testing
             
 instance Game_tree RNode where
                    
@@ -36,9 +73,6 @@ makeElemList _ [] = []
 makeElemList pC ("*":xs) = (0,"*") : makeElemList pC xs
 makeElemList pC (x:xs) = if (pC == x) then (1,pC) : makeElemList pC xs else ((-1),notPC) : makeElemList pC xs
     where   notPC = if pC == "W" then "B" else "W"
-
-
-
 
 
 makeChildrenFromMoves :: [(Int,Int)] -> (Array (Int,Int) (Int,String)) -> String -> String -> [RNode]
@@ -76,7 +110,7 @@ lookInDirectionFrom field pT (r,c) (dirRow, dirCol) = if ((field ! (r,c)) == ( 0
     where   checkNext nR nC = if ((nR <= ubR) && (nC <= ubC) && (nR >=lbR) && (nC >= lbC)) then True else False 
             countIt nR' nC' acc = if (checkNext nR' nC')            then 
                     if ((field ! (nR', nC')) == (0,"*"))            then 0      else
-                    if ((field ! (nR', nC')) == (1,pT))             then acc    else
+                    if ((field ! (nR', nC')) == (1,pT)&& acc >0)    then acc    else
                     countIt (nR'+dirRow) (nC'+dirCol) (acc +1)                  else 0 
                     
             ((lbR,lbC),(ubR, ubC)) = bounds field
