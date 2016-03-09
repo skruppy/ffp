@@ -1,6 +1,9 @@
+module KI where
+
 import Data.Tree.Game_tree.Negascout as NS
 import Data.Tree.Game_tree.Game_tree 
 import Data.Array
+import Sm
 
 alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];            
             
@@ -74,6 +77,11 @@ fillerLine len = ' ':' ':'├':'─':'─':'─': nextChars (len-1)
             nextChars 1 = '┼':'─':'─':'─':'┤':[]
             nextChars len' = '┼':'─':'─':'─':nextChars (len'-1)
           
+getPlayerColourFromGameData :: GameData -> String
+getPlayerColourFromGameData (GameData _ _ _ _ players) = itsMe $ firstItem
+    where   itsMe (PlayerItem _ _ True ) = "W"  
+            itsMe (PlayerItem _ _ False) = "B" 
+            firstItem = players ! 0
             
 getNextMove :: (Array (Int, Int) String) -> String -> String
 getNextMove field pC = getMoveFromRNode $ getNextRNode a searchdepth
