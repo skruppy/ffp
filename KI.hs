@@ -93,7 +93,7 @@ getNextRNode a i = res !! 1
 
             
 getMoveFromRNode:: RNode -> String
-getMoveFromRNode (RNode _ _ _ (Just (x,y))) = (show(alphabet !! (x-1))) ++ show y
+getMoveFromRNode (RNode _ _ _ (Just (x,y))) = (alphabet !! (x-1)): show y
 getMoveFromRNode (RNode _ _ _ Nothing) = ""
 
             
