@@ -1,5 +1,6 @@
 import Sm as S
 import Net
+import KI as KI
 import Network.Socket as NS
 import System.IO
 import Conf as C
@@ -34,7 +35,7 @@ play (Just host') (Just port') (Just gameId') player' = do
     let state = smCreate $ S.Cfg {
           S.gameId = gameId'
         , S.player = player'
-        , S.ai     = \gameData -> \field -> \time -> ("asd", Just $ putStrLn "asd")
+        , S.ai     = \gameData field time -> ((KI.getNextMove field (KI.getPlayerColourFromGameData gameData)) , Just $ putStrLn "asd")
         }
     input <- converse hdl []
     let (state', io) = smStep state input
