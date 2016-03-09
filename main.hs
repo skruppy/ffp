@@ -11,7 +11,13 @@ import System.Environment
 -- The name speaks for it self. Here you are looking at the beautiful main-l↺↺p.
 (↺) hdl (SmEnd)       = putStrLn ("OK")
 (↺) hdl (SmError msg) = putStrLn ("FAILED: "++msg)
-(↺) hdl (SmOk s o)    = fmap (smStep s) (converse hdl o) >>= (↺) hdl
+(↺) hdl (SmOk s o)    = do
+    i <- converse hdl o
+    let (s', io) = smStep s i
+    case io of
+        Just x -> x
+        _      -> return ()
+    (↺) hdl s'
 
 
 play Nothing _ _ _ = putStrLn ("Missing hostname")
@@ -29,10 +35,12 @@ play (Just host') (Just port') (Just gameId') player' = do
     let state = smCreate $ S.Cfg {
           S.gameId = gameId'
         , S.player = player'
-        , S.ai     = \time -> \field -> "asd"
+        , S.ai     = \gameData -> \field -> \time -> ("asd", Just $ putStrLn "asd")
         }
-    stepResult <- fmap (smStep state) (converse hdl [])
-    (↺) hdl stepResult
+    input <- converse hdl []
+    let (state', io) = smStep state input
+--     io
+    (↺) hdl state'
     
     -- So close!
     hClose hdl

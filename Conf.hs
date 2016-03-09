@@ -2,8 +2,6 @@ module Conf (IntermediateCfg(..),defaultCfg,emptyCfg,mergeCfg) where
 
 import Util
 
--- This definition is so boring, we had to add a joke:
--- Chuck Norris can write Haskell... in assembler.
 data IntermediateCfg = IntermediateCfg
     { host   :: Maybe String
     , port   :: Maybe String
@@ -31,6 +29,8 @@ defaultCfg = IntermediateCfg
     }
 
 
+-- This definition is so boring, we had to add a joke:
+-- Chuck Norris can write Haskell... in assembler.
 emptyCfg = IntermediateCfg
     { host   = Nothing
     , port   = Nothing
