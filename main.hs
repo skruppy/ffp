@@ -7,6 +7,7 @@ import Conf.Args as CA
 import Conf.Gui as CG
 import Data.String.Utils
 import System.Environment
+import Util
 
 -- The name speaks for it self. Here you are looking at the beautiful main-l↺↺p.
 (↺) hdl (SmEnd)       = putStrLn ("OK")
@@ -14,9 +15,7 @@ import System.Environment
 (↺) hdl (SmOk s o)    = do
     i <- converse hdl o
     let (s', io) = smStep s i
-    case io of
-        Just x -> x
-        _      -> return ()
+    maybio io
     (↺) hdl s'
 
 
@@ -39,7 +38,7 @@ play (Just host') (Just port') (Just gameId') player' = do
         }
     input <- converse hdl []
     let (state', io) = smStep state input
---     io
+    maybio io
     (↺) hdl state'
     
     -- So close!
