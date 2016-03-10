@@ -13,12 +13,6 @@ import Data.Array
 import Control.Concurrent
 import Control.Concurrent.MVar
 
-x :: (Array (Int, Int) String)
-x = listArray ((1,1),(12,12)) $take (12*12) $repeat "*"
-
-y :: (Array (Int, Int) String)
-y = listArray ((1,1),(12,12)) $take (12*12) $repeat "W"
-
 
 createGameGUI :: (MVar (Array (Int, Int) String)) -> IO ()
 createGameGUI mVField  = do 
@@ -49,8 +43,9 @@ updateField mVField buttons = do
          Just newField -> do
             let i = indices newField
             let e = elems newField
-            let changeLabel (y:[]) (x:[]) = do (buttonSetLabel x y)
-                changeLabel (y:ys) (x:xs)= do (buttonSetLabel x y) >> changeLabel ys xs
+            let makeCool a = if (a == "W") then "⛀" else if (a == "B") then "⛂" else " " 
+            let changeLabel (y:[]) (x:[]) = do (buttonSetLabel x (makeCool y))
+                changeLabel (y:ys) (x:xs)= do (buttonSetLabel x (makeCool y)) >> changeLabel ys xs
             changeLabel e buttons
     
                             
@@ -62,8 +57,11 @@ createButtons field table = do
                               
 createButton :: Table -> (Array (Int, Int) String) -> (Int,Int) -> IO Button
 createButton table field (r,c) = do 
-    let s = field ! (r,c)
+    let s = if ((field ! (r,c)) == "W") then "⛀" else if ((field ! (r,c)) == "B") then "⛂" else " " 
+    let ((_,_),(_, size)) = bounds field
+    let r' = r
+    let c' = size - c +1
     button <- buttonNewWithLabel s
-    tableAttachDefaults table button (c-1) (c) (r-1) (r)
+    tableAttachDefaults table button  (r'-1) (r') (c'-1) (c')
     return button
     
