@@ -1,4 +1,4 @@
-module Game.GUI where
+module GameGUI where
 
 import Graphics.UI.Gtk
 import KI
@@ -14,8 +14,8 @@ y :: (Array (Int, Int) String)
 y = listArray ((1,1),(12,12)) $take (12*12) $repeat "W"
 
 
-createGameGUI :: (MVar (Array (Int, Int) String)) -> [PlayerItem] -> IO ()
-createGameGUI mVField players = do 
+createGameGUI :: (MVar (Array (Int, Int) String)) -> IO ()
+createGameGUI mVField  = do 
     initGUI
     window <- windowNew
     set window [windowTitle := "GUI", containerBorderWidth := 5,
@@ -30,7 +30,7 @@ createGameGUI mVField players = do
     onDestroy window mainQuit
     widgetShowAll window
     --windowPresent window
-    timeoutAdd ((updateField mVField buttons) >> return True) 100
+    timeoutAdd ((updateField mVField buttons)>> yield >> return True) 100
     
     mainGUI
                         
