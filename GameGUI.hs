@@ -14,14 +14,15 @@ import Control.Concurrent
 import Control.Concurrent.MVar
 
 
-createGameGUI :: (MVar (Array (Int, Int) String)) -> IO ()
-createGameGUI mVField  = do 
+createGameGUI :: (MVar (Array (Int, Int) String))-> (MVar GameData) -> IO ()
+createGameGUI mVField  mVGameData = do 
     initGUI
     window <- windowNew
     set window [windowTitle := "GUI", containerBorderWidth := 5,
                 windowDefaultWidth := 500, windowDefaultHeight := 500]
                 
-    field <- takeMVar mVField 
+    field <- takeMVar mVField
+    gameData <- takeMVar mVGameData
     let ((_,_),(_,size)) = bounds field
     table <- tableNew size size True 
     buttons <- createButtons field table
