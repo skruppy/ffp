@@ -1,5 +1,5 @@
 language: haskell
-ghc: 7.8
+ghc: 7.6
 before_install:
   - travis_retry cabal update
   - export PATH=$PATH:$PWD/.cabal/bin/
