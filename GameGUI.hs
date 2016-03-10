@@ -7,6 +7,12 @@ import Data.Array
 import Control.Concurrent
 import Control.Concurrent.MVar
 
+x :: (Array (Int, Int) String)
+x = listArray ((1,1),(12,12)) $take (12*12) $repeat "*"
+
+y :: (Array (Int, Int) String)
+y = listArray ((1,1),(12,12)) $take (12*12) $repeat "W"
+
 
 createGameGUI :: (MVar (Array (Int, Int) String)) -> [PlayerItem] -> IO ()
 createGameGUI mVField players = do 
@@ -24,19 +30,22 @@ createGameGUI mVField players = do
     onDestroy window mainQuit
     widgetShowAll window
     --windowPresent window
-    timeoutAdd (updateField mVField buttons >> return True) 100 
+    timeoutAdd ((updateField mVField buttons) >> return True) 100
     
     mainGUI
                         
                         
 updateField :: (MVar (Array (Int, Int) String)) -> [Button] -> IO()
 updateField mVField buttons = do
-    newField <- takeMVar mVField
-    let i = indices newField
-    let e = elems newField
-    let changeLabel (y:[]) (x:[]) = do (buttonSetLabel x y)
-        changeLabel (y:ys) (x:xs)= do (buttonSetLabel x y) >> changeLabel ys xs
-    changeLabel e buttons
+    maybeNewField <- tryTakeMVar mVField
+    case maybeNewField of
+         Nothing ->  do return ()
+         Just newField -> do
+            let i = indices newField
+            let e = elems newField
+            let changeLabel (y:[]) (x:[]) = do (buttonSetLabel x y)
+                changeLabel (y:ys) (x:xs)= do (buttonSetLabel x y) >> changeLabel ys xs
+            changeLabel e buttons
     
                             
 createButtons :: (Array (Int, Int) String)-> Table -> IO [Button]
