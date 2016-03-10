@@ -43,7 +43,7 @@ makeLinePretty (x:xs) = "│" ++ newx ++ makeLinePretty xs
 
     
 getLineFromArray :: Int -> Int -> (Array (Int, Int) String) -> [String]
-getLineFromArray line size field = getElementsFromTo (line*size) ((line+1)*size) (elems field)
+getLineFromArray line size field = getElementsFromTo (line*size) (size) (elems field)
 
 
 getElementsFromTo ::Int -> Int -> [a] -> [a]
