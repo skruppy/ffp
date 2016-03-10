@@ -1,13 +1,18 @@
+module KI where
+
 import Data.Tree.Game_tree.Negascout as NS
 import Data.Tree.Game_tree.Game_tree 
 import Data.Array
+import Sm
+import Control.Concurrent.MVar
+import System.IO.Unsafe
 
 alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];            
             
 --              Up   UpRight Right DownRight Down DownLeft Left   UpLeft
 directions = [(-1,0),(-1,1), (0,1),(1,1),    (1,0),(1,-1), (0,-1),(-1,-1)]
 
-searchdepth = 5  
+searchdepth = -200
 
 data RNode = 
     RNode  {gamefield       :: (Array (Int, Int) (Int, String)),
@@ -16,76 +21,27 @@ data RNode =
             lastMove        :: Maybe (Int,Int)
             } deriving (Eq, Show)
 
-prettyPrint :: (Array (Int, Int) String) -> IO ()
-prettyPrint field = do
-                        let (_,(_,size)) = bounds field
-                        putStrLn $ firstLine size
-                        printLines size size field
-  
-  
-printLines :: Int -> Int ->(Array (Int, Int) String) -> IO()
-printLines 1 len field = putStrLn (itemLine 1 len field) >> putStrLn (finalLine len) >> putStrLn (indexLine len)
-printLines todo len field = (putStrLn (itemLine todo len field)) >> (putStrLn (fillerLine len)) >> (printLines (todo -1) len field)
-
-
-itemLine :: Int -> Int ->(Array (Int, Int) String) -> String
-itemLine line len field = number ++ (makeLinePretty $ getLineFromArray line len field)
-    where number = if line < 10 then " " ++ (show line) else (show line)
-        
-        
-makeLinePretty :: [String] -> String
-makeLinePretty [] = "│"
-makeLinePretty (x:xs) = "│" ++ newx ++ makeLinePretty xs
-    where newx = if (x == "W")then " ⛀ " else if x == "B" then " ⛂ " else " * "
-
-    
-getLineFromArray :: Int -> Int -> (Array (Int, Int) String) -> [String]
-getLineFromArray line size field = getElementsFromTo (line*size) ((line+1)*size) (elems field)
-
-
-getElementsFromTo ::Int -> Int -> [a] -> [a]
-getElementsFromTo 0 0 _ = []
-getElementsFromTo 0 totake (x:xs) = x: getElementsFromTo 0 (totake - 1) xs
-getElementsFromTo x totake list = getElementsFromTo (x-1) totake list
-
-
-finalLine :: Int -> String
-finalLine len = ' ':' ':'└':'─':'─':'─': nextChars (len-1)
-    where   nextChars 0 = '┘':[]
-            nextChars 1 = '┴':'─':'─':'─':'┘':[]
-            nextChars len' = '┴':'─':'─':'─':nextChars (len'-1)
-
-indexLine :: Int -> String
-indexLine len = ' ':' ':' ':' ':'A':' ': nextChars (len-1)
-    where   nextChars 0 = []
-            nextChars 1 = ' ':' ':(alphabet !! (len - 1)):' ':' ':[]
-            nextChars len' = ' ':' ':(alphabet !! (len - len')):' ':nextChars (len'-1)
-
-firstLine:: Int -> String
-firstLine len = ' ':' ':'┌':'─':'─':'─': nextChars (len-1)
-    where   nextChars 0 = '┐':[]
-            nextChars 1 = '┬':'─':'─':'─':'┐':[]
-            nextChars len' = '┬':'─':'─':'─':nextChars (len'-1)
-
-            
-fillerLine:: Int -> String
-fillerLine len = ' ':' ':'├':'─':'─':'─': nextChars (len-1)
-    where   nextChars 0 = '┤':[]
-            nextChars 1 = '┼':'─':'─':'─':'┤':[]
-            nextChars len' = '┼':'─':'─':'─':nextChars (len'-1)
           
+getPlayerColourFromGameData :: GameData -> String
+getPlayerColourFromGameData (GameData _ _ _ _ players) = itsMe $ firstItem
+    where   itsMe (PlayerItem _ _ True ) = "B"  
+            itsMe (PlayerItem _ _ False) = "W" 
+            firstItem = players ! 0
             
-getNextMove :: (Array (Int, Int) String) -> String -> String
-getNextMove field pC = getMoveFromRNode $ getNextRNode a searchdepth
+getNextMove :: (MVar (Array (Int, Int) String)) -> (Array (Int, Int) String) -> GameData  -> String
+getNextMove mvar field gameData = if ( t == True) then getMoveFromRNode $ getNextRNode a searchdepth else getMoveFromRNode $ getNextRNode a searchdepth
     where a = (RNode (createWeightedArray pC field) pC pC Nothing)
+          pC = getPlayerColourFromGameData gameData
+          t = unsafePerformIO $ tryPutMVar mvar field 
+          
             
 getNextRNode :: RNode -> Int -> RNode
 getNextRNode a i = res !! 1
-    where (res, _) = alpha_beta_search a i
+    where (res, _) = negamax a i
 
             
 getMoveFromRNode:: RNode -> String
-getMoveFromRNode (RNode _ _ _ (Just (x,y))) = (show(alphabet !! (x-1))) ++ show y
+getMoveFromRNode (RNode _ _ _ (Just (x,y))) = (alphabet !! (x-1)): show y
 getMoveFromRNode (RNode _ _ _ Nothing) = ""
 
             
@@ -149,7 +105,7 @@ lookInDirectionFrom field pT (r,c) (dirRow, dirCol) = if ((field ! (r,c)) == ( 0
     where   checkNext nR nC = if ((nR <= ubR) && (nC <= ubC) && (nR >=lbR) && (nC >= lbC)) then True else False 
             countIt nR' nC' acc = if (checkNext nR' nC')            then 
                     if ((field ! (nR', nC')) == (0,"*"))            then 0      else
-                    if ((field ! (nR', nC')) == (1,pT)&& acc >0)    then acc    else
+                    if ((field ! (nR', nC')) == (1,pT))             then acc    else
                     countIt (nR'+dirRow) (nC'+dirCol) (acc +1)                  else 0 
                     
             ((lbR,lbC),(ubR, ubC)) = bounds field

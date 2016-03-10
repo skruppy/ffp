@@ -1,4 +1,4 @@
-module Sm (StepResult(..),Cfg(..),smCreate,smStep) where
+module Sm (StepResult(..),Cfg(..),GameData(..),PlayerItem(..),smCreate,smStep) where
 
 import Data.Array
 import Data.List
