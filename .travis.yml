@@ -1,10 +1,7 @@
 language: haskell
 ghc: 7.8
-before_script:
+before_install:
   - export PATH=$PATH:$PWD/.cabal/bin/
+  - cabal install gtk2hs-buildtools
+  - pwd
   - env
-install:
- - cabal install gtk2hs-buildtools
- - cabal install --dep
-script:
- - cabal build
