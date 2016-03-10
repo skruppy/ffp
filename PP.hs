@@ -19,9 +19,9 @@ prettyPrint field = do
   
   
 printLines :: Int -> Int ->(Array (Int, Int) String) -> IO()
-printLines 1 len field = putStrLn (itemLine 1 len field) >> putStrLn (finalLine len) >> putStrLn (indexLine len)
-printLines todo len field = (putStrLn (itemLine todo len field)) >> (putStrLn (fillerLine len)) >> (printLines (todo -1) len field)
-
+printLines 1    len field = putStrLn (itemLine 1 len field)     >> putStrLn (finalLine len)     >> putStrLn (indexLine len)
+printLines todo len field = putStrLn (itemLine todo len field)  >> putStrLn (fillerLine len)    >> printLines (todo -1) len field
+    
 
 itemLine :: Int -> Int ->(Array (Int, Int) String) -> String
 itemLine line len field = number ++ (makeLinePretty $ getLineFromArray line len field)
@@ -31,17 +31,18 @@ itemLine line len field = number ++ (makeLinePretty $ getLineFromArray line len 
 makeLinePretty :: [String] -> String
 makeLinePretty [] = "│"
 makeLinePretty (x:xs) = "│" ++ newx ++ makeLinePretty xs
-    where newx = if (x == "W")then " ⛀ " else if x == "B" then " ⛂ " else " * "
+    where newx = if (x == "W")then " ⛂ " else if x == "B" then " ⛀ " else " * "
 
     
 getLineFromArray :: Int -> Int -> (Array (Int, Int) String) -> [String]
-getLineFromArray line size field = getElementsFromTo (line*size) (size) (elems field)
+getLineFromArray line size field = getElementsFromTo (line) size (elems field)
 
 
 getElementsFromTo ::Int -> Int -> [a] -> [a]
-getElementsFromTo 0 0 _ = []
-getElementsFromTo 0 totake (x:xs) = x: getElementsFromTo 0 (totake - 1) xs
-getElementsFromTo x totake list = getElementsFromTo (x-1) totake list
+getElementsFromTo line 0 _ = []
+getElementsFromTo line size elems = (elems !! (line -1 )) : (getNextElem line size (size-1) elems)
+    where   getNextElem _ _ 0 _ = []
+            getNextElem line size todo elems = (elems !! ((line -1) + size * (size-todo))): (getNextElem line size (todo-1) elems)
 
 
 finalLine :: Int -> String
