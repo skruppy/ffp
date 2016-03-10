@@ -1,5 +1,6 @@
 language: haskell
-ghc: 7.6
+
+
 before_install:
   - travis_retry cabal update
   - export PATH=$PATH:$PWD/.cabal/bin/
@@ -7,3 +8,13 @@ before_install:
   - env
   - cabal install Cabal
   - cabal install gtk2hs-buildtools
+addons:
+ apt:
+  sources:
+  - hvr-ghc
+ packages:
+  - ghc-7.10.1
+  - cabal-install-1.22
+  - alex-3.1.4
+  - happy-1.19.5
+  - libgtk-3-dev
