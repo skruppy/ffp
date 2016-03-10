@@ -4,4 +4,4 @@ before_install:
   - export PATH=$PATH:$PWD/.cabal/bin/
   - pwd
   - env
-  - cabal install gtk2hs-buildtools-0.12.5.1
+#  - cabal install gtk2hs-buildtools-0.12.5.1
