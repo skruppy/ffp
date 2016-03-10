@@ -4,21 +4,31 @@ import Data.Array
 import Data.List
 import Data.Maybe
 import Text.Regex.Posix
+import Data.Ix
 
 
 data StepResult
     = SmOk QuallifiedState [String]
-    | SmEnd
+    | SmEnd GameData (Maybe Int)
     | SmError String
 
 data QuallifiedState
     = QuallifiedState State Cfg
 
+-- The following state definition is extremely confusing without propper type
+-- names, therefore we define some:
 type Major = Int
 type Minor = Int
 type GameType = String
 type GameName = String
 type MoveTime = Int
+type WinnerId = Int
+
+data BoardTransReason
+    = Winner Int
+    | Draw
+    | Move MoveTime
+      deriving (Eq, Show)
 
 data State
     = StartState
@@ -30,20 +40,20 @@ data State
     | PlayerLineState  Major Minor GameType GameName (Array Int (Maybe PlayerItem)) Int
     | PlayerEndState   Major Minor GameType GameName (Array Int (Maybe PlayerItem))
     | IdleState        GameData
-    | FieldStartState  GameData (Maybe MoveTime)
-    | FieldLineState   GameData (Maybe MoveTime) Int Int Int [[String]]
-    | FieldEndState    GameData (Maybe MoveTime) Int Int [[String]]
-    | ThinkingState    GameData        MoveTime  (Array (Int, Int) String)
+    | FieldStartState  GameData BoardTransReason
+    | FieldLineState   GameData BoardTransReason      Int         Int  Int [[String]]
+    | FieldEndState    GameData BoardTransReason                  Int  Int [[String]]
+    | ThinkingState    GameData MoveTime                  (Array (Int, Int)  String)
     | MoveState        GameData
-    | QuitState        GameData
-    | EndState         GameData
+    | QuitState        GameData (Maybe WinnerId)
+    | EndState         GameData (Maybe WinnerId)
     | ErrorState
       deriving (Eq, Show)
 
 data Cfg = Cfg
     { gameId :: String
     , player :: Maybe Int
-    , ai     :: GameData -> ((Array (Int, Int) String) -> Int -> (String, Maybe (IO ())))
+    , ai     :: GameData -> Array (Int, Int) String -> Int -> ( String, Maybe (IO ()) )
     }
 
 data PlayerItem = PlayerItem
@@ -144,52 +154,70 @@ parseInput (PlayerEndState major minor gameType gameName players) cfg input =
 
 parseInput (IdleState gameData) cfg input =
     case input of
-         "+ WAIT" -> (IdleState gameData, ["OKWAIT"], Nothing)
-         _ | length moveParts == 1     -> (FieldStartState gameData (Just $ read $ head moveParts), [], Nothing)
-         _ | length gameoverParts == 2 -> (FieldStartState gameData Nothing, [], Nothing)
+         "+ WAIT"     -> (IdleState gameData, ["OKWAIT"], Nothing)
+         "+ GAMEOVER" -> (FieldStartState gameData Draw, [], Nothing)
+         _ | length moveParts == 1     -> (FieldStartState gameData (Move $ read $ head moveParts), [], Nothing)
+         _ | length gameoverParts == 2 ->
+             case gameoverParts of
+                 [name, nr] ->
+                     let
+                         nr' = read nr
+                         players' = players gameData
+                     in
+                         if inRange (bounds players') nr'
+                         then
+                             let
+                                 name' = playerName $ players' ! nr'
+                             in
+                                 if name == name'
+                                 then (FieldStartState gameData (Winner 1), [], Nothing)
+                                 else (ErrorState, [], Nothing)
+                         else (ErrorState, [], Nothing)
+                 otherwise -> (ErrorState, [], Nothing)
          otherwise -> (ErrorState, [], Nothing)
     where
         (_, _, _, moveParts)     = (input =~ "^\\+ MOVE ([1-9][0-9]*)$"     :: (String, String, String, [String]))
         (_, _, _, gameoverParts) = (input =~ "^\\+ GAMEOVER ([0-9]+) (.+)$" :: (String, String, String, [String]))
 
 
-parseInput (FieldStartState gameData time) cfg input =
+parseInput (FieldStartState gameData boardTransReason) cfg input =
     if length xs == 2
        then let [x, y] = map read xs
-            in (FieldLineState gameData time x y y [], [], Nothing)
+            in (FieldLineState gameData boardTransReason x y y [], [], Nothing)
        else (ErrorState, [], Nothing)
     where
         (_, _, _, xs) = (input =~ "^\\+ FIELD ([1-9][0-9]*),([1-9][0-9]*)$" :: (String, String, String, [String]))
 
 
-parseInput (FieldLineState gameData time x y curY field) cfg input =
+parseInput (FieldLineState gameData boardTransReason x y curY field) cfg input =
     case xs of
         [n, s] -> let elements = words s in
             if length elements /= x then (ErrorState, [], Nothing) else
             if read n /= curY then (ErrorState, [], Nothing) else
-            if curY > 1 then (FieldLineState gameData time x y (curY-1) (elements:field), [], Nothing) else
-            (FieldEndState gameData time x y (elements:field), [], Nothing)
+            if curY > 1 then (FieldLineState gameData boardTransReason x y (curY-1) (elements:field), [], Nothing) else
+            (FieldEndState gameData boardTransReason x y (elements:field), [], Nothing)
         otherwise -> (ErrorState, [], Nothing)
     where
        (_, _, _, xs) = (input =~ "^\\+ ([1-9][0-9]*) (.+)$" :: (String, String, String, [String]))
 
 
-parseInput (FieldEndState gameData time x y field) cfg input =
+parseInput (FieldEndState gameData boardTransReason x y field) cfg input =
     if input == "+ ENDFIELD" then
-        case time of
-            Just t    -> (ThinkingState gameData t f, ["THINKING"], Nothing)
-            otherwise -> (QuitState gameData, [], Nothing)
+        case boardTransReason of
+            Move time     -> (ThinkingState gameData time f,    ["THINKING"], Nothing)
+            Winner winner -> (QuitState gameData (Just winner), [],           Nothing)
+            Draw          -> (QuitState gameData (Nothing),     [],           Nothing)
     else (ErrorState, [], Nothing)
     where
         f = listArray ((1,1), (x,y)) (concat $ transpose field)
 
 
-parseInput (ThinkingState gameData time field) cfg input =
+parseInput (ThinkingState gameData boardTransReason field) cfg input =
     if input == "+ OKTHINK"
        then (MoveState gameData, ["PLAY "++move], io)
        else (ErrorState, [], Nothing)
     where
-        (move, io) = ai cfg gameData field time
+        (move, io) = ai cfg gameData field boardTransReason
 
 
 parseInput (MoveState gameData) cfg input =
@@ -198,13 +226,13 @@ parseInput (MoveState gameData) cfg input =
        else (ErrorState, [], Nothing)
 
 
-parseInput (QuitState gameData) cfg input =
+parseInput (QuitState gameData winner) cfg input =
     if input == "+ QUIT"
-       then (EndState gameData, [], Nothing)
+       then (EndState gameData winner, [], Nothing)
        else (ErrorState, [], Nothing)
 
 
-parseInput (EndState gameData) cfg input = error ("No input line should ever be parsed in the end state, but we still got \""++input++"\"")
+parseInput (EndState gameData winner) cfg input = error ("No input line should ever be parsed in the end state, but we still got \""++input++"\"")
 
 
 parseInput ErrorState cfg input = error ("No input line should ever be parsed in the error state, but we still got \""++input++"\"")
@@ -216,6 +244,6 @@ smCreate cfg = QuallifiedState StartState cfg
 
 smStep (QuallifiedState s c) input =
     case parseInput s c input of
-        (ErrorState, _, _)        -> (SmError "Failed", Nothing)
-        (EndState gameData, _, _) -> (SmEnd, Nothing)
-        (s', output, io)          -> (SmOk (QuallifiedState s' c) output, io)
+        (ErrorState               , _      , _ ) -> (SmError "Failed"                   , Nothing)
+        (EndState gameData winner , _      , _ ) -> (SmEnd gameData winner              , Nothing)
+        (s'                       , output , io) -> (SmOk (QuallifiedState s' c) output , io     )

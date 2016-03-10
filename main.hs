@@ -10,9 +10,9 @@ import System.Environment
 import Util
 
 -- The name speaks for it self. Here you are looking at the beautiful main-l↺↺p.
-(↺) hdl (SmEnd)       = putStrLn ("OK")
-(↺) hdl (SmError msg) = putStrLn ("FAILED: "++msg)
-(↺) hdl (SmOk s o)    = do
+(↺) hdl (SmEnd gameData winner) = putStrLn ("OK")
+(↺) hdl (SmError msg)           = putStrLn ("FAILED: "++msg)
+(↺) hdl (SmOk s o)              = do
     i <- converse hdl o
     let (s', io) = smStep s i
     maybio io
