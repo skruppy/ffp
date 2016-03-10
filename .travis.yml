@@ -1,6 +1,6 @@
 language: haskell
 
-ghc: 7.10.1
+ghc: 7.10
 
 addons:
  apt:
