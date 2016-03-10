@@ -1,2 +1,4 @@
 language: haskell
-ghc: 7.8
+before_script:
+  - export PATH=$PATH:$PWD/.cabal/bin/
+  - env
