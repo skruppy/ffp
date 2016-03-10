@@ -29,7 +29,6 @@ createGameGUI mVField players = do
     mainGUI
                         
                         
-                        
 updateField :: (MVar (Array (Int, Int) String)) -> [Button] -> IO()
 updateField mVField buttons = do
     newField <- takeMVar mVField
