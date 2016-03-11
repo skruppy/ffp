@@ -38,15 +38,15 @@ getPlayerColourFromGameData (GameData _ _ _ _ players) = itsMe $ firstItem
         firstItem = players ! 0
 
 
-getNextMove :: (MVar (Array (Int, Int) String)) -> (Array (Int, Int) String) -> GameData  -> String
-getNextMove mvar field gameData =
+getNextMove :: (MVar (Array (Int, Int) String)) -> (MVar GameData)-> (Array (Int, Int) String) -> GameData  -> String
+getNextMove mVarField mVarGameData field gameData =
     if ( t == True)
         then getMoveFromRNode $ getNextRNode a searchdepth
         else getMoveFromRNode $ getNextRNode a searchdepth
     where
         a  = (RNode (createWeightedArray pC field) pC pC Nothing)
         pC = getPlayerColourFromGameData gameData
-        t  = unsafePerformIO $ tryPutMVar mvar field 
+        t  = unsafePerformIO $ ((tryPutMVar mVarField field)>>(tryPutMVar mVarGameData gameData))
 
 
 getNextRNode :: RNode -> Int -> RNode

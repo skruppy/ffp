@@ -18,6 +18,7 @@ import Util
 import GameGUI as GG
 import Control.Concurrent.MVar
 import Control.Concurrent
+import PP as PP
 
 -- The name speaks for it self. Here you are looking at the beautiful main-l↺↺p.
 (↺) hdl (SmEnd gameData winner) = putStrLn ("OK")
@@ -39,12 +40,13 @@ play (Just host') (Just port') (Just gameId') player' = do
     hdl    <- socketToHandle socket ReadWriteMode
     hSetBuffering hdl NoBuffering
     mVarField <- newEmptyMVar
-    forkIO $ GG.createGameGUI mVarField
+    mVarGameData <- newEmptyMVar
+    forkIO $ GG.createGameGUI mVarField mVarGameData
     -- Main loop
     let state = smCreate $ S.Cfg {
           S.gameId = gameId'
         , S.player = player'
-        , S.ai     = \gameData field time -> ((KI.getNextMove mVarField field gameData) , Just $ putStrLn "asd")
+        , S.ai     = \gameData field time -> ((KI.getNextMove mVarField mVarGameData field gameData) , Just $ PP.prettyPrint field)
         }
     input <- converse hdl []
     let (state', io) = smStep state input
