@@ -24,10 +24,12 @@ createGameGUI mVField  mVGameData = do
     field <- takeMVar mVField
     gameData <- takeMVar mVGameData
     let ((_,_),(_,size)) = bounds field
-    table <- tableNew size size True 
-    buttons <- createButtons field table
+    table <- tableNew (size +1) (size +1) True 
     
+    buttons <- createButtons field table
+    addLabels table size
     containerAdd window table
+    
     onDestroy window mainQuit
     widgetShowAll window
     --windowPresent window
@@ -61,9 +63,39 @@ createButton :: Table -> (Array (Int, Int) String) -> (Int,Int) -> IO Button
 createButton table field (r,c) = do 
     let s = if ((field ! (r,c)) == "W") then "⛀" else if ((field ! (r,c)) == "B") then "⛂" else " " 
     let ((_,_),(_, size)) = bounds field
-    let r' = r
+    let r' = r +1
     let c' = size - c +1
     button <- buttonNewWithLabel s
     tableAttachDefaults table button  (r'-1) (r') (c'-1) (c')
     return button
 
+addLabels :: Table -> Int -> IO ()
+addLabels table size = do
+    let toList 0 = []
+        toList x = x : (toList (x-1))
+    let nums = toList size
+    let labelsNum = map (\y -> show y) nums
+    let labelsAlpha = map (\x -> (alphabet !! (x-1):"")) nums
+    let numIndi = map (\x -> (size - x + 1,1)) nums
+    let alphaIndi = map (\x -> (size+1, x +1)) nums
+    nlabels <- createLabels table numIndi labelsNum
+    alabels <- createLabels table alphaIndi labelsAlpha
+    return ()
+    
+    
+    
+    
+createLabels :: Table -> [(Int,Int)] -> [String] -> IO ([Label])
+createLabels _     []         _           = do return []
+createLabels table coord labelStrings = do
+    labels <- mapM labelNew (map Just labelStrings)
+    let trippel = zip labels coord
+    mapM_ (\(l,(c,r)) -> tableAttachDefaults table l (r-1) r (c-1) c) trippel
+    return labels
+    
+    
+    
+    
+    
+    
+    
