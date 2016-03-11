@@ -7,8 +7,6 @@ addons:
     sources:
       - hvr-ghc
     packages:
-      - ghc-7.10.1
-      #- cabal-install-1.22
       - alex-3.1.4
       - happy-1.19.5
       - libgtk-3-dev
