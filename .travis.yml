@@ -3,23 +3,18 @@ language: haskell
 ghc: 7.8
 
 addons:
- apt:
-  sources:
-  - hvr-ghc
-  packages:
-   - ghc-7.10.1
-   - cabal-install-1.22
-   - alex-3.1.4
-   - happy-1.19.5
-   - libgtk-3-dev
-   - libgtk2.0-dev
+  apt:
+    sources:
+      - hvr-ghc
+    packages:
+      - cabal-install-1.22
+      - libgtk-3-dev
+      - libgtk2.0-dev
+
 before_install:
-  - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/1.22/bin:/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:$PATH
+  - export PATH=/opt/cabal/1.22/bin
   - travis_retry cabal update
   - export PATH=$PATH:$PWD/.cabal/bin/
-  - ls -l /opt/cabal
-  - pwd
   - env
-  #- cabal install Cabal
   - cabal install gtk2hs-buildtools
   - cabal install --only-dependencies --enable-tests --force-reinstalls
