@@ -13,6 +13,6 @@ addons:
       - libgtk2.0-dev
 
 before_install:
-  - export PATH=/opt/cabal/1.22/bin:/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:$PATH
+  - export PATH=/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:$PATH
   - cabal install gtk2hs-buildtools
   - cabal install --only-dependencies --enable-tests --force-reinstalls
