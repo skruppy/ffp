@@ -7,364 +7,428 @@
 module SmSpec where
 
 import Test.Hspec
-import Sm
+import Sm.Internal
 import Data.Array
 
-cfg = Cfg {gameId = "GameId", player = Just 1}
+testAi gameData field time = ("test" , Nothing)
+cfg = Cfg {gameId = "GameId", player = Just 1, ai = testAi}
 
-players = array (0, 1) [
-    (0, PlayerItem {playerName = Just "Hans Peter", isReady = True}),
-    (1, PlayerItem {playerName = Nothing, isReady = True})]
+testPlayers = array (0, 1) [
+    (0, Just PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True}),
+    (1, Just PlayerItem {playerName = "Horst", isReady = True, itsMe = False})]
+
+gameData = GameData
+    { serverMajor = 1
+    , serverMinor = 23
+    , gameType    = "Reversi"
+    , gameName    = "Game name"
+    , players     = array (0, 1)
+        [(0, PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True})
+        ,(1, PlayerItem {playerName = "Horst", isReady = True, itsMe = False})]
+    }
 
 field = array ((1,1), (3,2)) [
     ((1,2), "2"), ((2,2), "3"), ((3,2), "5"),
     ((1,1), "7"), ((2,1),"11"), ((3,1),"13")]
 
+
+-- Cut away IO from parser result, to be able to compare/test it
+stateShouldBe (a, b, _) (a', b') = (a, b) `shouldBe` (a', b')
+
+
+testStep (SmOk s o) (x:xs) = testStep s' xs
+    where
+        (s', _) = smStep s x
+
+testStep result     []     = result
+
+testStep result     _      = result
+
+
+sm (x:xs) cfg = testStep s xs
+    where
+        (s, _) = smStep (smCreate cfg) x
+
+
 main :: IO ()
 main = hspec $ do
     describe "Parsing in start state (+ MNM Gameserver v1.? accepting connections)" $ do
         it "Valid version number (one-digit minor)" $ do
-            (parseInput StartState cfg "+ MNM Gameserver v1.0 accepting connections") `shouldBe` (VersionState, ["VERSION 1.42"])
+            (parseInput StartState cfg "+ MNM Gameserver v1.0 accepting connections")  `stateShouldBe` (VersionState 1  0, ["VERSION 1.42"])
         
         it "Valid version number (two-digit minor)" $ do
-            (parseInput StartState cfg "+ MNM Gameserver v1.23 accepting connections") `shouldBe` (VersionState, ["VERSION 1.42"])
+            (parseInput StartState cfg "+ MNM Gameserver v1.23 accepting connections") `stateShouldBe` (VersionState 1 23, ["VERSION 1.42"])
         
         it "Invalid version number (major != 1)" $ do
-            (parseInput StartState cfg "+ MNM Gameserver v2.0 accepting connections") `shouldBe` (ErrorState, [])
-        
-        it "Invalid input (random)" $ do
-            (parseInput StartState cfg "+ asd") `shouldBe` (ErrorState, [])
+            (parseInput StartState cfg "+ MNM Gameserver v2.0 accepting connections")  `stateShouldBe` (ErrorState "Only protocol version 1 supported. Caussed by \"+ MNM Gameserver v2.0 accepting connections\"", [])
         
         it "Invalid input (zero-digit major)" $ do
-            (parseInput StartState cfg "+ MNM Gameserver v.0 accepting connections") `shouldBe` (ErrorState, [])
+            (parseInput StartState cfg "+ MNM Gameserver v.0 accepting connections")   `stateShouldBe` (ErrorState "Protocoll error: Expected server banner, but got \"+ MNM Gameserver v.0 accepting connections\"", [])
         
         it "Invalid input (zero-digit minor)" $ do
-            (parseInput StartState cfg "+ MNM Gameserver v1. accepting connections") `shouldBe` (ErrorState, [])
+            (parseInput StartState cfg "+ MNM Gameserver v1. accepting connections")   `stateShouldBe` (ErrorState "Protocoll error: Expected server banner, but got \"+ MNM Gameserver v1. accepting connections\"", [])
+        
+        it "Invalid input (random)" $ do
+            (parseInput StartState cfg "+ asd")                                        `stateShouldBe` (ErrorState "Protocoll error: Expected server banner, but got \"+ asd\"", [])
     
     
     describe "Parsing in version state (+ Client version accepted - please send Game-ID to join)" $ do
         it "Valid input" $ do
-            parseInput VersionState cfg "+ Client version accepted - please send Game-ID to join" `shouldBe` (GameKindState, ["ID GameId"])
+            parseInput (VersionState 1 23) cfg "+ Client version accepted - please send Game-ID to join" `stateShouldBe` (GameKindState 1 23, ["ID GameId"])
         
         it "Valid input (different game id)" $ do
-            parseInput VersionState (Cfg {gameId = "asd", player = Just 1}) "+ Client version accepted - please send Game-ID to join" `shouldBe` (GameKindState, ["ID asd"])
+            parseInput (VersionState 1 23) (Cfg {gameId = "asd", player = Just 1, ai = testAi}) "+ Client version accepted - please send Game-ID to join" `stateShouldBe` (GameKindState 1 23, ["ID asd"])
         
         it "Inalid input (random)" $ do
-            parseInput VersionState cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (VersionState 1 23) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected client version to be accepted, but got \"+ asd\"", [])
     
     
     describe "Parsing in game kind state (+ PLAYING ?)" $ do
-        it "Valid input" $ do -- Different games
-            parseInput GameKindState cfg "+ PLAYING Reversi" `shouldBe` (GameNameState, [])
+        it "Valid input" $ do
+            parseInput (GameKindState 1 23) cfg "+ PLAYING Reversi"  `stateShouldBe` (GameNameState 1 23 "Reversi", [])
         
-        it "Valid input" $ do -- Different games
-            parseInput GameKindState cfg "+ PLAYING Checkers" `shouldBe` (GameNameState, [])
+        it "Valid input" $ do
+            parseInput (GameKindState 1 23) cfg "+ PLAYING Checkers" `stateShouldBe` (GameNameState 1 23 "Checkers", [])
         
         it "Invalid input (missing game kind)" $ do
-            parseInput GameKindState cfg  "+ PLAYING " `shouldBe` (ErrorState, [])
+            parseInput (GameKindState 1 23) cfg  "+ PLAYING "        `stateShouldBe` (ErrorState "Protocoll error: Expected game kind, but got \"+ PLAYING \"", [])
         
         it "Invalid input (random)" $ do
-            parseInput GameKindState cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (GameKindState 1 23) cfg "+ asd"              `stateShouldBe` (ErrorState "Protocoll error: Expected game kind, but got \"+ asd\"", [])
     
     
     describe "Parsing in game kind state (+ ?)" $ do
         it "Valid input (one-digit player number)" $ do
-            parseInput GameNameState (Cfg {gameId = "GameId", player = Just 1}) "+ Game name" `shouldBe` (PlayerStartState, ["PLAYER 1"])
+            parseInput (GameNameState 1 23 "Reversi") (Cfg {gameId = "GameId", player = Just 1, ai = testAi}) "+ Game name" `stateShouldBe` (PlayerNameState 1 23 "Reversi" "Game name", ["PLAYER 1"])
         
         it "Valid input (two-digit player number)" $ do
-            parseInput GameNameState (Cfg {gameId = "GameId", player = Just 42}) "+ Game name" `shouldBe` (PlayerStartState, ["PLAYER 42"])
+            parseInput (GameNameState 1 23 "Reversi") (Cfg {gameId = "GameId", player = Just 42, ai = testAi}) "+ Game name" `stateShouldBe` (PlayerNameState 1 23 "Reversi" "Game name", ["PLAYER 42"])
         
         it "Valid input (no player number)" $ do
-            parseInput GameNameState (Cfg {gameId = "GameId", player = Nothing}) "+ Game name" `shouldBe` (PlayerStartState, ["PLAYER"])
+            parseInput (GameNameState 1 23 "Reversi") (Cfg {gameId = "GameId", player = Nothing, ai = testAi}) "+ Game name" `stateShouldBe` (PlayerNameState 1 23 "Reversi" "Game name", ["PLAYER"])
         
         it "Invalid input (missing game name)" $ do
-            parseInput GameNameState cfg  "+ " `shouldBe` (ErrorState, [])
+            parseInput (GameNameState 1 23 "Reversi") cfg  "+ " `stateShouldBe` (ErrorState "Protocoll error: Expected game name, but got \"+ \"", [])
         
         it "Invalid input (random)" $ do
-            parseInput GameNameState cfg "asd" `shouldBe` (ErrorState, [])
+            parseInput (GameNameState 1 23 "Reversi") cfg "asd" `stateShouldBe` (ErrorState "Protocoll error: Expected game name, but got \"asd\"", [])
     
     
     describe "Parsing in player start state (+ TOTAL ?)" $ do
         it "Valid input (one-digit player number)" $ do
-            parseInput PlayerStartState cfg "+ TOTAL 2" `shouldBe` (
-                PlayerLineState
-                (array (0, 1)  [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True})])
-                0, [])
+            parseInput (PlayerStartState 1 23 "Reversi" "Game name" 0 (PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True})) cfg "+ TOTAL 2"
+            `stateShouldBe`
+            ( PlayerLineState 1 23 "Reversi" "Game name"
+              ( array
+                (0, 1)
+                [ (0, Just $ PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True}),
+                  (1, Nothing)
+                ]
+              )
+              0
+            , []
+            )
 
         it "Valid input (two-digit player number)" $ do
-            parseInput PlayerStartState cfg "+ TOTAL 12" `shouldBe` (
-                PlayerLineState
-                (listArray (0, 11)  (replicate 12 PlayerItem {playerName = Nothing, isReady = True})) 10, [])
+            parseInput (PlayerStartState 1 23 "Reversi" "Game name" 0 (PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True})) cfg "+ TOTAL 12"
+            `stateShouldBe`
+            ( PlayerLineState
+              1 23 "Reversi" "Game name"
+              ( listArray
+                (0, 11)
+                ( (Just $ PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True})
+                : (replicate 11 Nothing)
+                )
+              )
+              10
+            , []
+            )
 
         it "Invalid input (zero players)" $ do
-            parseInput PlayerStartState cfg "+ TOTAL 0" `shouldBe` (ErrorState, [])
+            parseInput (PlayerStartState 1 23 "Reversi" "Game name" 0 (PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True})) cfg "+ TOTAL 0" `stateShouldBe` (ErrorState "Protocoll error: Expected numer of oponents, but got \"+ TOTAL 0\"", [])
 
         it "Invalid input (no player number)" $ do
-            parseInput PlayerStartState cfg "+ TOTAL " `shouldBe` (ErrorState, [])
+            parseInput (PlayerStartState 1 23 "Reversi" "Game name" 0 (PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True})) cfg "+ TOTAL " `stateShouldBe` (ErrorState "Protocoll error: Expected numer of oponents, but got \"+ TOTAL \"", [])
             
         it "Invalid input (random)" $ do
-            parseInput PlayerStartState cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (PlayerStartState 1 23 "Reversi" "Game name" 0 (PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True})) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected numer of oponents, but got \"+ asd\"", [])
             
             
     describe "Parsing in player line state (+ ? ? ?)" $ do
         it "Valid input (lower bound)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 2) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True}),
-                    (2, PlayerItem {playerName = Nothing, isReady = True})])
-                1) cfg "+ 0 Hans Peter 1" `shouldBe` (
-                    PlayerLineState
+                    (0, Nothing),
+                    (1, Nothing),
+                    (2, Nothing)])
+                1) cfg "+ 0 Hans Peter 1" `stateShouldBe` (
+                    PlayerLineState 1 23 "Reversi" "Game name"
                     (array (0, 2) [
-                        (0, PlayerItem {playerName = Just "Hans Peter", isReady = True}),
-                        (1, PlayerItem {playerName = Nothing, isReady = True}),
-                        (2, PlayerItem {playerName = Nothing, isReady = True})])
+                        (0, Just $ PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = False}),
+                        (1, Nothing),
+                        (2, Nothing)])
                     0, [])
                     
         it "Valid input (middle)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 2) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True}),
-                    (2, PlayerItem {playerName = Nothing, isReady = True})])
-                1) cfg "+ 1 Hans Peter 1" `shouldBe` (
-                    PlayerLineState
+                    (0, Nothing),
+                    (1, Nothing),
+                    (2, Nothing)])
+                1) cfg "+ 1 Hans Peter 1" `stateShouldBe` (
+                    PlayerLineState 1 23 "Reversi" "Game name"
                     (array (0, 2) [
-                        (0, PlayerItem {playerName = Nothing, isReady = True}),
-                        (1, PlayerItem {playerName = Just "Hans Peter", isReady = True}),
-                        (2, PlayerItem {playerName = Nothing, isReady = True})])
+                        (0, Nothing),
+                        (1, Just $ PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = False}),
+                        (2, Nothing)])
                     0, [])
                     
         it "Valid input (upper bound)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 2) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True}),
-                    (2, PlayerItem {playerName = Nothing, isReady = True})])
-                1) cfg "+ 2 Hans Peter 1" `shouldBe` (
-                    PlayerLineState
+                    (0, Nothing),
+                    (1, Nothing),
+                    (2, Nothing)])
+                1) cfg "+ 2 Hans Peter 1" `stateShouldBe` (
+                    PlayerLineState 1 23 "Reversi" "Game name"
                     (array (0, 2) [
-                        (0, PlayerItem {playerName = Nothing, isReady = True}),
-                        (1, PlayerItem {playerName = Nothing, isReady = True}),
-                        (2, PlayerItem {playerName = Just "Hans Peter", isReady = True})])
+                        (0, Nothing),
+                        (1, Nothing),
+                        (2, Just $ PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = False})])
                     0, [])
                     
         it "Valid input (not ready)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 2) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True}),
-                    (2, PlayerItem {playerName = Nothing, isReady = True})])
-                1) cfg "+ 1 Hans Peter 0" `shouldBe` (
-                    PlayerLineState
+                    (0, Nothing),
+                    (1, Nothing),
+                    (2, Nothing)])
+                1) cfg "+ 1 Hans Peter 0" `stateShouldBe` (
+                    PlayerLineState 1 23 "Reversi" "Game name"
                     (array (0, 2) [
-                        (0, PlayerItem {playerName = Nothing, isReady = True}),
-                        (1, PlayerItem {playerName = Just "Hans Peter", isReady = False}),
-                        (2, PlayerItem {playerName = Nothing, isReady = True})])
+                        (0, Nothing),
+                        (1, Just $ PlayerItem {playerName = "Hans Peter", isReady = False, itsMe = False}),
+                        (2, Nothing)])
                     0, [])
                     
         it "Valid input (got to end)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 1) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True})])
-                0) cfg "+ 0 Hans Peter 1" `shouldBe` (
-                    PlayerEndState
+                    (0, Nothing),
+                    (1, Nothing)])
+                0) cfg "+ 0 Hans Peter 1" `stateShouldBe` (
+                    PlayerEndState 1 23 "Reversi" "Game name"
                     (array (0, 1) [
-                        (0, PlayerItem {playerName = Just "Hans Peter", isReady = True}),
-                        (1, PlayerItem {playerName = Nothing, isReady = True})]), [])
+                        (0, Just $ PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = False}),
+                        (1, Nothing)]), [])
                     
         it "Invalid input (duplicate)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 2) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Just "Hans Peter", isReady = True}),
-                    (2, PlayerItem {playerName = Nothing, isReady = True})])
-                1) cfg "+ 1 Hans Peter 1" `shouldBe` (ErrorState, [])
+                    (0, Nothing),
+                    (1, Just $ PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = False}),
+                    (2, Nothing)])
+                1) cfg "+ 1 Hans Peter 1" `stateShouldBe` (ErrorState "Player already defined. Caussed by \"+ 1 Hans Peter 1\"", [])
                     
         it "Invalid input (out of range)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 1) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True})])
-                0) cfg "+ 3 Hans Peter 1" `shouldBe` (ErrorState, [])
+                    (0, Nothing),
+                    (1, Nothing)])
+                0) cfg "+ 3 Hans Peter 1" `stateShouldBe` (ErrorState "Player ID out of bounds. Caussed by \"+ 3 Hans Peter 1\"", [])
                     
         it "Invalid input (invalid ready state)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 1) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True})])
-                0) cfg "+ 1 Hans Peter 2" `shouldBe` (ErrorState, [])
+                    (0, Nothing),
+                    (1, Nothing)])
+                0) cfg "+ 1 Hans Peter 2" `stateShouldBe` (ErrorState "Protocoll error: Expected oponent info, but got \"+ 1 Hans Peter 2\"", [])
                     
         it "Invalid input (missing ready state)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 1) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True})])
-                0) cfg "+ 1 Hans Peter " `shouldBe` (ErrorState, [])
+                    (0, Nothing),
+                    (1, Nothing)])
+                0) cfg "+ 1 Hans Peter " `stateShouldBe` (ErrorState "Protocoll error: Expected oponent info, but got \"+ 1 Hans Peter \"", [])
                     
         it "Invalid input (missing player number)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 1) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True})])
-                0) cfg "+  Hans Peter 1" `shouldBe` (ErrorState, [])
+                    (0, Nothing),
+                    (1, Nothing)])
+                0) cfg "+  Hans Peter 1" `stateShouldBe` (ErrorState "Protocoll error: Expected oponent info, but got \"+  Hans Peter 1\"", [])
                     
         it "Invalid input (random)" $ do
             parseInput (
-                PlayerLineState
+                PlayerLineState 1 23 "Reversi" "Game name"
                 (array (0, 1) [
-                    (0, PlayerItem {playerName = Nothing, isReady = True}),
-                    (1, PlayerItem {playerName = Nothing, isReady = True})])
-                0) cfg "+ asd" `shouldBe` (ErrorState, [])
+                    (0, Nothing),
+                    (1, Nothing)])
+                0) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected oponent info, but got \"+ asd\"", [])
             
             
     describe "Parsing in player end state (+ ENDPLAYERS)" $ do
         it "Valid input" $ do
-            parseInput (PlayerEndState players) cfg "+ ENDPLAYERS" `shouldBe` ((IdleState players), [])
+            parseInput (PlayerEndState 1 23 "Reversi" "Game name" testPlayers) cfg "+ ENDPLAYERS" `stateShouldBe` ((IdleState gameData), [])
             
         it "Invalid input" $ do
-            parseInput (PlayerEndState players) cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (PlayerEndState 1 23 "Reversi" "Game name" testPlayers) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected end of oponent list, but got \"+ asd\"", [])
             
             
     describe "Parsing in idle state (+ WAIT / + MOVE ? / + GAMEOVER ? ?)" $ do
         it "Valid input (wait)" $ do
-            parseInput (IdleState players) cfg "+ WAIT" `shouldBe` ((IdleState players), ["OKWAIT"])
+            parseInput (IdleState gameData) cfg "+ WAIT" `stateShouldBe` ((IdleState gameData), ["OKWAIT"])
             
         it "Valid input (move)" $ do
-            parseInput (IdleState players) cfg "+ MOVE 3000" `shouldBe` ((FieldStartState players (Just 3000)), [])
+            parseInput (IdleState gameData) cfg "+ MOVE 3000" `stateShouldBe` ((FieldStartState gameData (Move 3000)), [])
             
-        it "Valid input (gameover)" $ do
-            parseInput (IdleState players) cfg "+ GAMEOVER 1 Hans Peter" `shouldBe` ((FieldStartState players Nothing), [])
+        it "Valid input (gameover draw)" $ do
+            parseInput (IdleState gameData) cfg "+ GAMEOVER" `stateShouldBe` ((FieldStartState gameData Draw), [])
+            
+        it "Valid input (gameover winner)" $ do
+            parseInput (IdleState gameData) cfg "+ GAMEOVER 1 Horst" `stateShouldBe` ((FieldStartState gameData (Winner 1)), [])
+        
+        it "Invalid input (gameover wrong name)" $ do
+            parseInput (IdleState gameData) cfg "+ GAMEOVER 1 Hans Peter" `stateShouldBe` (ErrorState "The winner name is not part of the players list. Caussed by \"+ GAMEOVER 1 Hans Peter\"", [])
+        
+        it "Invalid input (gameover out of bounds)" $ do
+            parseInput (IdleState gameData) cfg "+ GAMEOVER 42 Hans Peter" `stateShouldBe` (ErrorState "The winners player ID is out of bounds. Caussed by \"+ GAMEOVER 42 Hans Peter\"", [])
         
         it "Invalid input (move time 0)" $ do
-            parseInput (IdleState players) cfg "+ MOVE 0" `shouldBe` (ErrorState, [])
+            parseInput (IdleState gameData) cfg "+ MOVE 0" `stateShouldBe` (ErrorState "Protocoll error: Expected wait/gameover/move, but got \"+ MOVE 0\"", [])
             
         it "Invalid input (move missing time)" $ do
-            parseInput (IdleState players) cfg "+ MOVE " `shouldBe` (ErrorState, [])
+            parseInput (IdleState gameData) cfg "+ MOVE " `stateShouldBe` (ErrorState "Protocoll error: Expected wait/gameover/move, but got \"+ MOVE \"", [])
             
         it "Invalid input (random)" $ do
-            parseInput (IdleState players) cfg "+ asd " `shouldBe` (ErrorState, [])
+            parseInput (IdleState gameData) cfg "+ asd " `stateShouldBe` (ErrorState "Protocoll error: Expected wait/gameover/move, but got \"+ asd \"", [])
         
         it "Inalid input (gameover missing name)" $ do
-            parseInput (IdleState players) cfg "+ GAMEOVER 1" `shouldBe` (ErrorState, [])
+            parseInput (IdleState gameData) cfg "+ GAMEOVER 1" `stateShouldBe` (ErrorState "Protocoll error: Expected wait/gameover/move, but got \"+ GAMEOVER 1\"", [])
         
         it "Inalid input (gameover missing number)" $ do
-            parseInput (IdleState players) cfg "+ GAMEOVER Hans Peter" `shouldBe` (ErrorState, [])
+            parseInput (IdleState gameData) cfg "+ GAMEOVER Hans Peter" `stateShouldBe` (ErrorState "Protocoll error: Expected wait/gameover/move, but got \"+ GAMEOVER Hans Peter\"", [])
         
         it "Inalid input (random)" $ do
-            parseInput (IdleState players) cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (IdleState gameData) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected wait/gameover/move, but got \"+ asd\"", [])
             
             
     describe "Parsing in field start state (+ FIELD ?,?)" $ do
         it "Valid input (one digit)" $ do
-            parseInput (FieldStartState players (Just 42)) cfg "+ FIELD 2,3" `shouldBe` (
-                (FieldLineState players (Just 42) 2 3 3 []), [])
+            parseInput (FieldStartState gameData (Move 42)) cfg "+ FIELD 2,3" `stateShouldBe` (
+                (FieldLineState gameData (Move 42) 2 3 3 []), [])
                 
         it "Valid input (two digit)" $ do
-            parseInput (FieldStartState players (Just 42)) cfg "+ FIELD 22,33" `shouldBe` (
-                (FieldLineState players (Just 42) 22 33 33 []), [])
+            parseInput (FieldStartState gameData (Move 42)) cfg "+ FIELD 22,33" `stateShouldBe` (
+                (FieldLineState gameData (Move 42) 22 33 33 []), [])
                 
         it "Invalid input (x=0)" $ do
-            parseInput (FieldStartState players (Just 42)) cfg "+ FIELD 0,3" `shouldBe` (ErrorState, [])
+            parseInput (FieldStartState gameData (Move 42)) cfg "+ FIELD 0,3" `stateShouldBe` (ErrorState "Protocoll error: Expected start of board, but got \"+ FIELD 0,3\"", [])
             
         it "Invalid input (y=0)" $ do
-            parseInput (FieldStartState players (Just 42)) cfg "+ FIELD 2,0" `shouldBe` (ErrorState, [])
+            parseInput (FieldStartState gameData (Move 42)) cfg "+ FIELD 2,0" `stateShouldBe` (ErrorState "Protocoll error: Expected start of board, but got \"+ FIELD 2,0\"", [])
             
         it "Invalid input (missing x)" $ do
-            parseInput (FieldStartState players (Just 42)) cfg "+ FIELD ,3" `shouldBe` (ErrorState, [])
+            parseInput (FieldStartState gameData (Move 42)) cfg "+ FIELD ,3" `stateShouldBe` (ErrorState "Protocoll error: Expected start of board, but got \"+ FIELD ,3\"", [])
             
         it "Invalid input (missing y)" $ do
-            parseInput (FieldStartState players (Just 42)) cfg "+ FIELD 2," `shouldBe` (ErrorState, [])
+            parseInput (FieldStartState gameData (Move 42)) cfg "+ FIELD 2," `stateShouldBe` (ErrorState "Protocoll error: Expected start of board, but got \"+ FIELD 2,\"", [])
             
         it "Invalid input (random)" $ do
-            parseInput (FieldStartState players (Just 42)) cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (FieldStartState gameData (Move 42)) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected start of board, but got \"+ asd\"", [])
 
 
     describe "Parsing in field end state (+ ? ? ? ? ? ...)" $ do
         it "Valid input (first line)" $ do
-            parseInput (FieldLineState players (Just 3000) 3 2 2 []) cfg "+ 2 2 3 5" `shouldBe` (
-                (FieldLineState players (Just 3000) 3 2 1 [["2","3","5"]]), [])
+            parseInput (FieldLineState gameData (Move 3000) 3 2 2 []) cfg "+ 2 2 3 5" `stateShouldBe` (
+                (FieldLineState gameData (Move 3000) 3 2 1 [["2","3","5"]]), [])
         
         it "Valid input (last line)" $ do
-            parseInput (FieldLineState players (Just 3000) 3 2 1 [["2","3","5"]]) cfg "+ 1 7 11 13" `shouldBe` (
-                (FieldEndState players (Just 3000) 3 2 ([["7","11","13"],["2","3","5"]]) ), [])
+            parseInput (FieldLineState gameData (Move 3000) 3 2 1 [["2","3","5"]]) cfg "+ 1 7 11 13" `stateShouldBe` (
+                (FieldEndState gameData (Move 3000) 3 2 ([["7","11","13"],["2","3","5"]]) ), [])
         
         it "Invalid input (wrong line number)" $ do
-            parseInput (FieldLineState players (Just 3000) 3 2 2 []) cfg "+ 1 7 11 13" `shouldBe` (ErrorState, [])
+            parseInput (FieldLineState gameData (Move 3000) 3 2 2 []) cfg "+ 1 7 11 13" `stateShouldBe` (ErrorState "Unexpected row number. Caussed by \"+ 1 7 11 13\"", [])
         
         it "Invalid input (to long)" $ do
-            parseInput (FieldLineState players (Just 3000) 3 2 2 []) cfg "+ 2 7 11 13 23" `shouldBe` (ErrorState, [])
+            parseInput (FieldLineState gameData (Move 3000) 3 2 2 []) cfg "+ 2 7 11 13 23" `stateShouldBe` (ErrorState "Row has invalid number of elements. Caussed by \"+ 2 7 11 13 23\"", [])
         
         it "Invalid input (to short)" $ do
-            parseInput (FieldLineState players (Just 3000) 3 2 2 []) cfg "+ 2 7 11" `shouldBe` (ErrorState, [])
+            parseInput (FieldLineState gameData (Move 3000) 3 2 2 []) cfg "+ 2 7 11" `stateShouldBe` (ErrorState "Row has invalid number of elements. Caussed by \"+ 2 7 11\"", [])
         
         it "Invalid input (random)" $ do
-            parseInput (FieldLineState players (Just 3000) 3 2 2 []) cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (FieldLineState gameData (Move 3000) 3 2 2 []) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected board row, but got \"+ asd\"", [])
             
             
     describe "Parsing in field end state (+ ENDFIELD)" $ do
         it "Valid input (AI)" $ do
             parseInput (
-                    FieldEndState players (Just 3000) 3 2
+                    FieldEndState gameData (Move 3000) 3 2
                     ([["7","11","13"],["2","3","5"]]) )
-                cfg "+ ENDFIELD" `shouldBe` ((ThinkingState players 3000 field), ["THINKING"])
+                cfg "+ ENDFIELD" `stateShouldBe` ((ThinkingState gameData 3000 field), ["THINKING"])
         
         it "Valid input (quit)" $ do
             parseInput (
-                    FieldEndState players Nothing 3 2
+                    FieldEndState gameData Draw 3 2
                     ([["7","11","13"],["2","3","5"]]) )
-                cfg "+ ENDFIELD" `shouldBe` (QuitState, [])
+                cfg "+ ENDFIELD" `stateShouldBe` (QuitState gameData Nothing, [])
+        
+        it "Valid input (quit)" $ do
+            parseInput (
+                    FieldEndState gameData (Winner 0) 3 2
+                    ([["7","11","13"],["2","3","5"]]) )
+                cfg "+ ENDFIELD" `stateShouldBe` (QuitState gameData (Just 0), [])
             
         it "Invalid input" $ do
-            parseInput (FieldEndState players (Just 3000) 3 2 [["7","11","13"],["2","3","5"]]) cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (FieldEndState gameData (Move 3000) 3 2 [["7","11","13"],["2","3","5"]]) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected end of board, but got \"+ asd\"", [])
 
             
     describe "Parsing in player end state (+ OKTHINK)" $ do
         it "Valid input" $ do
-            parseInput (ThinkingState players 3000 field) cfg "+ OKTHINK" `shouldBe` ((MoveState players), ["PLAY test"])
+            parseInput (ThinkingState gameData 3000 field) cfg "+ OKTHINK" `stateShouldBe` ((MoveState gameData), ["PLAY test"])
             
         it "Invalid input" $ do
-            parseInput (ThinkingState players 3000 field) cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (ThinkingState gameData 3000 field) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected OKTHINK, but got \"+ asd\"", [])
             
             
     describe "Parsing in player end state (+ MOVEOK)" $ do
         it "Valid input" $ do
-            parseInput (MoveState players) cfg "+ MOVEOK" `shouldBe` ((IdleState players), [])
+            parseInput (MoveState gameData) cfg "+ MOVEOK" `stateShouldBe` ((IdleState gameData), [])
             
         it "Invalid input" $ do
-            parseInput (MoveState players) cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (MoveState gameData) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected acceptance of our move, but got \"+ asd\"", [])
             
             
     describe "Parsing in player end state (+ QUIT)" $ do
         it "Valid input" $ do
-            parseInput QuitState cfg "+ QUIT" `shouldBe` (EndState, [])
+            parseInput (QuitState gameData (Just 0)) cfg "+ QUIT" `stateShouldBe` (EndState gameData (Just 0), [])
             
         it "Invalid input" $ do
-            parseInput QuitState cfg "+ asd" `shouldBe` (ErrorState, [])
+            parseInput (QuitState gameData (Just 0)) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected quit, but got \"+ asd\"", [])
             
             
+
+
     describe "Full test" $ do
         it "Valid input (big scenario)" $ do
             sm [
-                "+ MNM Gameserver v1.0 accepting connections",-- VERSION 1.0
+                "+ MNM Gameserver v1.23 accepting connections",-- VERSION 1.0
                 "+ Client version accepted - please send Game-ID to join", -- ID ...
                 "+ PLAYING Reversi",
-                "+ The name of the game", -- PLAYER ...
+                "+ Game name", -- PLAYER ...
+                "+ YOU 0 Hans Peter",
                 "+ TOTAL 2",
-                "+ 1 Player 1 1",
+                "+ 1 Horst 1",
                 "+ ENDPLAYERS",
                 "+ WAIT", -- OKWAIT
                 "+ WAIT", -- OKWAIT
@@ -387,7 +451,7 @@ main = hspec $ do
                 "+ MOVEOK",
                 "+ WAIT", -- OKWAIT
                 "+ WAIT", -- OKWAIT
-                "+ GAMEOVER 0 Your Name",
+                "+ GAMEOVER 0 Hans Peter",
                 "+ FIELD 12,12",
                 "+ 12 * * * * * * * * * * * *",
                 "+ 11 * * * * * * * * * * * *",
@@ -402,130 +466,117 @@ main = hspec $ do
                 "+ 2 * * * * * * * * * * * *",
                 "+ 1 * * * * * * * * * * * *",
                 "+ ENDFIELD",
-                "+ QUIT"] cfg `shouldBe` True
+                "+ QUIT"] cfg `shouldBe` SmEnd gameData (Just 1)
                 
         it "Valid input (instant gameover)" $ do
             sm [
-                "+ MNM Gameserver v1.0 accepting connections",-- VERSION 1.0
+                "+ MNM Gameserver v1.23 accepting connections",-- VERSION 1.0
                 "+ Client version accepted - please send Game-ID to join", -- ID ...
                 "+ PLAYING Reversi",
-                "+ The name of the game", -- PLAYER ...
+                "+ Game name", -- PLAYER ...
+                "+ YOU 0 Hans Peter",
                 "+ TOTAL 2",
-                "+ 1 Player 1 1",
+                "+ 1 Horst 1",
                 "+ ENDPLAYERS",
-                "+ GAMEOVER 0 Your Name",
+                "+ GAMEOVER 0 Hans Peter",
                 "+ FIELD 4,4",
                 "+ 4 a b c d",
                 "+ 3 e f g h",
                 "+ 2 i j k l",
                 "+ 1 m n o p",
                 "+ ENDFIELD",
-                "+ QUIT"] cfg `shouldBe` True
+                "+ QUIT"] cfg `shouldBe` SmEnd gameData (Just 1)
                 
-        it "Valid input (missing last field)" $ do
+        it "Invalid input (missing last field)" $ do
             sm [
-                "+ MNM Gameserver v1.0 accepting connections",-- VERSION 1.0
+                "+ MNM Gameserver v1.23 accepting connections",-- VERSION 1.0
                 "+ Client version accepted - please send Game-ID to join", -- ID ...
                 "+ PLAYING Reversi",
-                "+ The name of the game", -- PLAYER ...
+                "+ Game name", -- PLAYER ...
+                "+ YOU 0 Hans Peter",
                 "+ TOTAL 2",
-                "+ 1 Player 1 1",
+                "+ 1 Horst 1",
                 "+ ENDPLAYERS",
-                "+ GAMEOVER 0 Your Name",
+                "+ GAMEOVER 0 Hans Peter",
                 "+ FIELD 4,4",
                 "+ 4 a b c d",
                 "+ 3 e f g h",
                 "+ 2 i j k l",
                 "+ ENDFIELD",
-                "+ QUIT"] cfg `shouldBe` False
+                "+ QUIT"] cfg `shouldBe` SmError "Protocoll error: Expected board row, but got \"+ ENDFIELD\""
                 
-        it "Valid input (missing first field)" $ do
+        it "Invalid input (missing first field)" $ do
             sm [
-                "+ MNM Gameserver v1.0 accepting connections",-- VERSION 1.0
+                "+ MNM Gameserver v1.23 accepting connections",-- VERSION 1.0
                 "+ Client version accepted - please send Game-ID to join", -- ID ...
                 "+ PLAYING Reversi",
-                "+ The name of the game", -- PLAYER ...
+                "+ Game name", -- PLAYER ...
+                "+ YOU 0 Hans Peter",
                 "+ TOTAL 2",
-                "+ 1 Player 1 1",
+                "+ 1 Horst 1",
                 "+ ENDPLAYERS",
-                "+ GAMEOVER 0 Your Name",
+                "+ GAMEOVER 0 Hans Peter",
                 "+ FIELD 4,4",
                 "+ 3 e f g h",
                 "+ 2 i j k l",
                 "+ 1 m n o p",
                 "+ ENDFIELD",
-                "+ QUIT"] cfg `shouldBe` False
+                "+ QUIT"] cfg `shouldBe` SmError "Unexpected row number. Caussed by \"+ 3 e f g h\""
                 
-        it "Valid input (missing other players)" $ do
+        it "Invalid input (missing other players)" $ do
             sm [
-                "+ MNM Gameserver v1.0 accepting connections",-- VERSION 1.0
+                "+ MNM Gameserver v1.23 accepting connections",-- VERSION 1.0
                 "+ Client version accepted - please send Game-ID to join", -- ID ...
                 "+ PLAYING Reversi",
-                "+ The name of the game", -- PLAYER ...
+                "+ Game name", -- PLAYER ...
+                "+ YOU 0 Hans Peter",
                 "+ TOTAL 2",
                 "+ ENDPLAYERS",
-                "+ GAMEOVER 0 Your Name",
+                "+ GAMEOVER 0 Hans Peter",
                 "+ FIELD 4,4",
                 "+ 4 a b c d",
                 "+ 3 e f g h",
                 "+ 2 i j k l",
                 "+ 1 m n o p",
                 "+ ENDFIELD",
-                "+ QUIT"] cfg `shouldBe` False
+                "+ QUIT"] cfg `shouldBe` SmError "Protocoll error: Expected oponent info, but got \"+ ENDPLAYERS\""
                 
-        it "Valid input (duplicated players)" $ do
+        it "Invalid input (duplicated players)" $ do
             sm [
-                "+ MNM Gameserver v1.0 accepting connections",-- VERSION 1.0
+                "+ MNM Gameserver v1.23 accepting connections",-- VERSION 1.0
                 "+ Client version accepted - please send Game-ID to join", -- ID ...
                 "+ PLAYING Reversi",
-                "+ The name of the game", -- PLAYER ...
+                "+ Game name", -- PLAYER ...
+                "+ YOU 0 Hans Peter",
                 "+ TOTAL 3",
-                "+ 1 Player 1 1",
-                "+ 1 Player 1 1",
+                "+ 1 Horst 1",
+                "+ 1 Horst 1",
                 "+ ENDPLAYERS",
-                "+ GAMEOVER 0 Your Name",
+                "+ GAMEOVER 0 Hans Peter",
                 "+ FIELD 4,4",
                 "+ 4 a b c d",
                 "+ 3 e f g h",
                 "+ 2 i j k l",
                 "+ 1 m n o p",
                 "+ ENDFIELD",
-                "+ QUIT"] cfg `shouldBe` False
+                "+ QUIT"] cfg `shouldBe` SmError "Player already defined. Caussed by \"+ 1 Horst 1\""
                 
-        it "Valid input (to many players)" $ do
+        it "Invalid input (to many players)" $ do
             sm [
-                "+ MNM Gameserver v1.0 accepting connections",-- VERSION 1.0
+                "+ MNM Gameserver v1.23 accepting connections",-- VERSION 1.0
                 "+ Client version accepted - please send Game-ID to join", -- ID ...
                 "+ PLAYING Reversi",
-                "+ The name of the game", -- PLAYER ...
+                "+ Game name", -- PLAYER ...
+                "+ YOU 0 Hans Peter",
                 "+ TOTAL 2",
-                "+ 1 Player 1 1",
+                "+ 1 Horst 1",
                 "+ 2 Player 1 1",
                 "+ ENDPLAYERS",
-                "+ GAMEOVER 0 Your Name",
+                "+ GAMEOVER 0 Hans Peter",
                 "+ FIELD 4,4",
                 "+ 4 a b c d",
                 "+ 3 e f g h",
                 "+ 2 i j k l",
                 "+ 1 m n o p",
                 "+ ENDFIELD",
-                "+ QUIT"] cfg `shouldBe` False
-                
-        it "Valid input (not complete)" $ do
-            sm [
-                "+ MNM Gameserver v1.0 accepting connections",-- VERSION 1.0
-                "+ Client version accepted - please send Game-ID to join", -- ID ...
-                "+ PLAYING Reversi",
-                "+ The name of the game", -- PLAYER ...
-                "+ TOTAL 2",
-                "+ 1 Player 1 1",
-                "+ ENDPLAYERS",
-                "+ GAMEOVER 0 Your Name",
-                "+ FIELD 4,4",
-                "+ 4 a b c d",
-                "+ 3 e f g h",
-                "+ 2 i j k l",
-                "+ 1 m n o p",
-                "+ ENDFIELD"] cfg `shouldBe` False
-
-
+                "+ QUIT"] cfg `shouldBe` SmError "Protocoll error: Expected end of oponent list, but got \"+ 2 Player 1 1\""
