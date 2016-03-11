@@ -13,10 +13,13 @@ addons:
 before_install:
   ## A recent version of alex and happy is requeired to build gtk2hs-buildtools.
   ## Therefore its installed from ppa:hvr-ghc. Alternately
-  ## `cabal install happy alex` would do the trick
+  ## `cabal install happy alex` would do the trick.
   - export PATH=/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:$PATH
   
   ## It is not pulled in as a dependency (its installation destination is
   ## already in PATH).
-  - cabal install --enable-tests gtk2hs-buildtools
-  #- cabal install --only-dependencies --enable-tests --force-reinstalls
+  - cabal install gtk2hs-buildtools
+  
+  ## gtk2hs-buildtools installes vector and hashtable, so does our project.
+  ## Therefore we have to add `--force-reinstalls`.
+  - cabal install --only-dependencies --enable-tests --force-reinstalls
