@@ -7,8 +7,8 @@ addons:
     sources:
       - hvr-ghc
     packages:
-      - alex-3.1.4
       - happy-1.19.5
+      - alex-3.1.4
 
 before_install:
   ## A recent version of alex and happy is requeired to build gtk2hs-buildtools.

@@ -21,6 +21,9 @@ import GameGUI as GG
 import Control.Concurrent.MVar
 import Control.Concurrent
 import PP as PP
+import Paths_funthello (version)
+import Data.Version (showVersion)
+import System.Console.ANSI
 
 -- The name speaks for it self. Here you are looking at the beautiful main-l↺↺p.
 (↺) hdl (SmEnd gameData winner) = putStrLn ("OK")
@@ -59,11 +62,33 @@ play (Just host') (Just port') (Just gameId') player' = do
     hClose hdl
 
 
+align text n = text ++ (replicate (n - (length text)) ' ')
+
 main :: IO ()
 main = do
     -- Config from command line
     argsCfg <- CA.getCfg
     
+    -- http://patorjk.com/software/taag/#p=display&f=Big&t=funthello
+    setSGR [SetConsoleIntensity BoldIntensity]
+    putStrLn "   ______           _   _          _ _"
+    putStrLn "   |  ___|         | | | |        | | |"
+    putStrLn "   | |_ _   _ _ __ | |_| |__   ___| | | ___"
+    putStrLn "   |  _| | | | '_ \\| __| '_ \\ / _ \\ | |/ _ \\"
+    putStrLn "   | | | |_| | | | | |_| | | |  __/ | | (_) |"
+    putStrLn "   \\_|  \\__,_|_| |_|\\__|_| |_|\\___|_|_|\\___/"
+    setSGR [Reset]
+    putStrLn ""
+    setSGR [SetColor Foreground Dull Green]
+    putStr   "   Loading version "
+    putStr   $ showVersion version
+    putStr   " "
+    setSGR [SetBlinkSpeed SlowBlink]
+    putStr   "_"
+    putStrLn ""
+    setSGR [Reset]
+    putStrLn ""
+
     progName <- getProgName
     guiCfg <- if endswith "-gui" progName
         then let cfg = mergeCfg [argsCfg, defaultCfg] in CG.getCfg cfg

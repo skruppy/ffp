@@ -11,6 +11,8 @@ import Data.List
 import Data.Maybe
 import Text.Regex.Posix
 import Data.Ix
+import Paths_funthello (version)
+import Data.Version
 
 
 data StepResult
@@ -92,11 +94,12 @@ constraintError msg input = (ErrorState (msg++". Caussed by \""++input++"\""), [
 
 parseInput StartState cfg input =
     case map read xs of
-       [major, minor] | major == 1 -> (VersionState major minor, ["VERSION 1.42"], Nothing)
-       [major, minor]              -> constraintError "Only protocol version 1 supported" input
-       otherwise                   -> unexpectedInput "server banner" input
+       [major, minor] | major == clientMajor -> (VersionState major minor, ["VERSION "++(showVersion version)], Nothing)
+       [major, minor]                        -> constraintError "Only protocol version 1 supported" input
+       otherwise                             -> unexpectedInput "server banner" input
     where
         (_, _, _, xs) = input =~ "^\\+ MNM Gameserver v([0-9]+)\\.([0-9]+) accepting connections$" :: (String, String, String, [String])
+        clientMajor = head $ versionBranch version
 
 
 parseInput (VersionState major minor) cfg input =

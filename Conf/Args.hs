@@ -34,7 +34,7 @@ argParseCfg = IntermediateCfg <$> (
       )
     <*> (
         optional $ argument str
-      $ metavar "GAMEID" -- "mSPb8GUCKxc"
+      $ metavar "GAMEID"
      <> help    "Game ID"
       )
     <*> (

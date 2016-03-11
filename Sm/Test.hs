@@ -14,8 +14,8 @@ testAi gameData field time = ("test" , Nothing)
 cfg = Cfg {gameId = "GameId", player = Just 1, ai = testAi}
 
 testPlayers = array (0, 1) [
-    (0, Just PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True}),
-    (1, Just PlayerItem {playerName = "Horst", isReady = True, itsMe = False})]
+    (0, Just PlayerItem {playerName = "Hans Peter" , isReady = True , itsMe = True }),
+    (1, Just PlayerItem {playerName = "Horst"      , isReady = True , itsMe = False})]
 
 gameData = GameData
     { serverMajor = 1
@@ -23,8 +23,8 @@ gameData = GameData
     , gameType    = "Reversi"
     , gameName    = "Game name"
     , players     = array (0, 1)
-        [(0, PlayerItem {playerName = "Hans Peter", isReady = True, itsMe = True})
-        ,(1, PlayerItem {playerName = "Horst", isReady = True, itsMe = False})]
+        [(0, PlayerItem {playerName = "Hans Peter" , isReady = True , itsMe = True })
+        ,(1, PlayerItem {playerName = "Horst"      , isReady = True , itsMe = False})]
     }
 
 field = array ((1,1), (3,2)) [
