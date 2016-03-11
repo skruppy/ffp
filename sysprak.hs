@@ -4,6 +4,8 @@
 -- day, and you think this stuff is worth it, you can buy me a beer in return.
 --                                                     -- Albatrouss and Skruppy
 
+module Main where
+
 import Sm as S
 import Net
 import KI as KI

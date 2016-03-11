@@ -20,5 +20,5 @@ before_install:
   - pwd
   - env
   - cabal install Cabal
-  - cabal install gtk2hs-buildtools
+  #- cabal install gtk2hs-buildtools
   - cabal install --only-dependencies --enable-tests --force-reinstalls

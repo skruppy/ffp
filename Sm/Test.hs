@@ -4,7 +4,7 @@
 -- day, and you think this stuff is worth it, you can buy me a beer in return.
 --                                                     -- Albatrouss and Skruppy
 
-module SmSpec where
+module Main where
 
 import Test.Hspec
 import Sm.Internal
