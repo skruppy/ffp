@@ -12,7 +12,7 @@ addons:
       - libgtk2.0-dev
 
 before_install:
-  - export PATH=/opt/cabal/1.22/bin
+  - export PATH=$PATH:/opt/cabal/1.22/bin
   - travis_retry cabal update
   - export PATH=$PATH:$PWD/.cabal/bin/
   - env
