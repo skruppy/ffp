@@ -51,7 +51,7 @@ play (Just host') (Just port') (Just gameId') player' = do
     let state = smCreate $ S.Cfg {
           S.gameId = gameId'
         , S.player = player'
-        , S.ai     = \gameData field time -> ((KI.getNextMove mVarField mVarGameData field gameData) , Just $ PP.prettyPrint field)
+        , S.ai     = \gameData field time -> ((AI.getNextMove mVarField mVarGameData field gameData) , Just $ PP.prettyPrint field)
         }
     input <- converse hdl []
     let (state', io) = smStep state input
