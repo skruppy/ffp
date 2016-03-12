@@ -8,7 +8,7 @@ module Main where
 
 import Sm as S
 import Net
-import KI as KI
+import AI as AI
 import Network.Socket as NS
 import System.IO
 import Conf as C

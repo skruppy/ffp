@@ -8,7 +8,6 @@ module GameGUI where
 
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.Display.Label
-import KI
 import Sm
 import Data.Array
 import Control.Concurrent
@@ -95,7 +94,7 @@ addLabels table size = do
         toList x = x : (toList (x-1))
     let nums = toList size
     let labelsNum = map (\y -> show y) nums
-    let labelsAlpha = map (\x -> (alphabet !! (x-1):"")) nums
+    let labelsAlpha = map (\x -> (['A'..'Z'] !! (x-1):"")) nums
     let numIndi = map (\x -> (size - x + 1,1)) nums
     let alphaIndi = map (\x -> (size+1, x +1)) nums
     nlabels <- createLabels table numIndi labelsNum

@@ -4,7 +4,7 @@
 -- day, and you think this stuff is worth it, you can buy me a beer in return.
 --                                                     -- Albatrouss and Skruppy
 
-module KI where
+module AI where
 
 import Data.Tree.Game_tree.Negascout as NS
 import Data.Tree.Game_tree.Game_tree 

@@ -7,8 +7,6 @@
 module PP (prettyPrint) where
 
 import Data.Array
-import Sm
-import KI
 
 
 prettyPrint :: (Array (Int, Int) String) -> IO ()
@@ -54,8 +52,8 @@ finalLine len = ' ':' ':'└':'─':'─':'─': nextChars (len-1)
 indexLine :: Int -> String
 indexLine len = ' ':' ':' ':' ':'A':' ': nextChars (len-1)
     where   nextChars 0 = []
-            nextChars 1 = ' ':' ':(KI.alphabet !! (len - 1)):' ':' ':[]
-            nextChars len' = ' ':' ':(KI.alphabet !! (len - len')):' ':nextChars (len'-1)
+            nextChars 1 = ' ':' ':(['A'..'Z'] !! (len - 1)):' ':' ':[]
+            nextChars len' = ' ':' ':(['A'..'Z'] !! (len - len')):' ':nextChars (len'-1)
 
 firstLine:: Int -> String
 firstLine len = ' ':' ':'┌':'─':'─':'─': nextChars (len-1)
