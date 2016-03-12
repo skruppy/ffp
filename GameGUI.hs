@@ -34,7 +34,7 @@ createGameGUI mVField  mVGameData = do
     buttons <- createButtons field gameTable
     addLabels gameTable size
     -- player field
-    playerTable <- tableNew 1 2 True
+    playerTable <- tableNew (size+1) 1 True
     let getNameFromPlayer (PlayerItem s _ itsMe) = if itsMe then ("  <b>" ++ s  ++ "</b>") else s
     let getPlayername (GameData _ _ _ _ players) n = getNameFromPlayer (players ! n)
     let playername0 = (getPlayername gameData 0) ++ " ⛂"
