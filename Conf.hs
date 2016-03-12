@@ -17,15 +17,6 @@ data IntermediateCfg = IntermediateCfg
     }
 
 
--- data Cfg = Cfg
---     { host   :: String
---     , port   :: String
---     , conf   :: Maybe String
---     , gameId :: String
---     , player :: Maybe Int
---     }
-
-
 defaultCfg = IntermediateCfg
     { host   = Just "sysprak.onmars.eu"
     , port   = Just "1357"

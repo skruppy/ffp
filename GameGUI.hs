@@ -25,10 +25,9 @@ createGameGUI mVField  mVGameData = do
     set window [windowTitle := title, containerBorderWidth := 5,
                 windowDefaultWidth := 500, windowDefaultHeight := 500]
     
-    
     let ((_,_),(_,size)) = bounds field
     layoutTable <- tableNew 2 1 False
-    -- game field 
+    -- game field
     gameTable <- tableNew (size +1) (size +1) True 
     tableAttachDefaults layoutTable gameTable 0 1 0 1
     buttons <- createButtons field gameTable
@@ -88,6 +87,7 @@ createButton table field (r,c) = do
     tableAttachDefaults table button  (r'-1) (r') (c'-1) (c')
     return button
 
+
 addLabels :: Table -> Int -> IO ()
 addLabels table size = do
     let toList 0 = []
@@ -100,12 +100,10 @@ addLabels table size = do
     nlabels <- createLabels table numIndi labelsNum
     alabels <- createLabels table alphaIndi labelsAlpha
     return ()
-    
-    
-    
-    
+
+
 createLabels :: Table -> [(Int,Int)] -> [String] -> IO ([Label])
-createLabels _     []         _           = do return []
+createLabels _     []    _            = do return []
 createLabels table coord labelStrings = do
     labels <- mapM labelNew (map Just labelStrings)
     let trippel = zip labels coord

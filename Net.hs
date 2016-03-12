@@ -13,35 +13,40 @@ import System.Console.ANSI
 
 
 -- *Knock Knock* "Who's there?" "Denial of Service Attack" "Den...?"
-knockKnock :: [AddrInfo] -> IO Socket
+knockKnock :: [AddrInfo] -> IO (Either String Socket)
 knockKnock [] = do
     putStrLn "Oh noes, I can't connect to the server. The washing machine ate all my sock(et)s"
-    error "No valid address to connect to"
+    return $ Left "Can't connect"
 
 knockKnock (x:xs) = do
     putStr $ "Connecting to "++(show $ addrAddress x)
     sock <- socket (addrFamily x) Stream defaultProtocol
     res  <- try $ NS.connect sock (addrAddress x) :: IO (Either SomeException ())
     case res of
+        Right _ -> do
+            putStrLn " ✔"
+            return $ Right sock
         Left _ -> do
             putStrLn " ✘"
             sClose sock
             knockKnock xs
-        Right _ -> do
-            putStrLn " ✔"
-            return sock
 
 
 --         /String     /String
-connect :: HostName -> ServiceName -> IO Socket
+connect :: HostName -> ServiceName -> IO (Either String Socket)
 connect host port = withSocketsDo $ do
-    addrInfo <- getAddrInfo (Just hints) (Just host) (Just port)
-    sock     <- knockKnock addrInfo
-    return sock
+    res <- try $ getAddrInfo (Just hints) (Just host) (Just port) :: IO (Either SomeException [AddrInfo])
+    case res of
+        Right addrInfo -> do
+            sock <- knockKnock addrInfo
+            return sock
+        Left exception -> do
+            return $ Left $ "Can't resilve host or port:\n" ++ (show exception)
     where
-        hints = NS.defaultHints {
-            NS.addrFlags      = [AI_ADDRCONFIG,AI_V4MAPPED],
-            NS.addrSocketType = NS.Stream }
+        hints = NS.defaultHints
+            { NS.addrFlags      = [AI_ADDRCONFIG,AI_V4MAPPED]
+            , NS.addrSocketType = NS.Stream
+            }
 
 
 listen :: Handle -> IO String

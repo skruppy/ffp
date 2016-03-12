@@ -4,7 +4,7 @@
 -- day, and you think this stuff is worth it, you can buy me a beer in return.
 --                                                     -- Albatrouss and Skruppy
 
-module Conf.Gui (getCfg) where
+module Conf.Gui where
 
 import Graphics.UI.Gtk
 import Util
@@ -14,51 +14,87 @@ import System.Exit
 import Data.String.Utils
 
 
-labeledInputNew table row name text = do
-    label <- labelNew (Just name)
-    labelSetJustify label JustifyRight
-    tableAttachDefaults table label  0 1  (row) (row+1)
+data Gui = Gui
+    { guiWindow   :: Dialog
+    , guiInHost   :: Entry
+    , guiInPort   :: Entry
+    , guiInGameId :: Entry
+    , guiInPlayer :: Entry
+    , guiLabel    :: Label
+    }
 
+labeledInputNew table row name text = do
     input <- entryNew
     entrySetText input text
     tableAttachDefaults table input  1 2  (row) (row+1)
+    
+    label <- labelNewWithMnemonic name
+    miscSetAlignment label 1.0 0.5
+    labelSetMnemonicWidget label input
+    tableAttach table label  0 1  (row) (row+1) [Fill] [Fill] 0 0
+    
     return input
 
 
 foo input = if length text > 0 then Just text else Nothing where text = strip input
 
 
--- https://rosettacode.org/wiki/User_input/Graphical#Haskell
--- https://searchcode.com/codesearch/view/21757632/
-getCfg defaults = do
+createGui defaults = do
     initGUI
     
     window <- dialogNew
-    set window [windowTitle := "Sysprak client", containerBorderWidth := 10]
+    set window [windowTitle := "Funthello", containerBorderWidth := 10]
     
     dialogContainer <- dialogGetUpper window
     grid <- tableNew 0 0 False
+    tableSetRowSpacings grid 4
+    tableSetColSpacings grid 6
     boxPackStart dialogContainer grid PackNatural 0
     
     btCancel  <- dialogAddButton window stockCancel ResponseCancel
     btConnect <- dialogAddButton window stockConnect ResponseOk
     
-    inGameId <- labeledInputNew grid 0 "Game ID"   (fromMaybe "" $ gameId defaults)
-    inPlayer <- labeledInputNew grid 1 "Player ID" (maybe "" show $ player defaults)
-    inHost   <- labeledInputNew grid 2 "Hostname"  (fromMaybe "" $ host defaults)
-    inPort   <- labeledInputNew grid 3 "Port"      (fromMaybe "" $ port defaults)
+    inGameId <- labeledInputNew grid 0 "Game _ID"   (fromMaybe "" $ gameId defaults)
+    inPlayer <- labeledInputNew grid 1 "P_layer ID" (maybe "" show $ player defaults)
+    inHost   <- labeledInputNew grid 2 "Ho_stname"  (fromMaybe "" $ host defaults)
+    inPort   <- labeledInputNew grid 3 "_Port"      (fromMaybe "" $ port defaults)
+    
+    label <- labelNew Nothing
+    labelSetJustify label JustifyLeft
+    labelSetLineWrap label True
+    miscSetAlignment label 0.0 0.5
+    boxPackStart dialogContainer label PackGrow 0
     
     widgetShowAll window
-    dialogResult <- dialogRun window
+    dialogSetDefaultResponse window ResponseOk
+    
+    return Gui
+        { guiWindow   = window
+        , guiInHost   = inHost
+        , guiInPort   = inPort
+        , guiInGameId = inGameId
+        , guiInPlayer = inPlayer
+        , guiLabel    = label
+        }
+
+
+-- https://rosettacode.org/wiki/User_input/Graphical#Haskell
+-- https://searchcode.com/codesearch/view/21757632/
+getCfg gui msg = do
+    labelSetMarkup (guiLabel gui) ("<span color=\"red\" weight=\"bold\">"++msg++"</span>")
+    dialogResult <- dialogRun $ guiWindow gui
     
     dummy <- case dialogResult of
-        ResponseCancel -> exitSuccess
+        ResponseCancel      -> exitSuccess -- User clicked "cancel"
+        ResponseDeleteEvent -> exitSuccess -- User closed the window
         _ -> return ()
     
-    txtHost   <- entryGetText inHost
-    txtPort   <- entryGetText inPort
-    txtGameId <- entryGetText inGameId
-    txtPlayer <- entryGetText inPlayer
+--     widgetHide window
+    
+    txtHost   <- entryGetText $ guiInHost gui
+    txtPort   <- entryGetText $ guiInPort gui
+    txtGameId <- entryGetText $ guiInGameId gui
+    txtPlayer <- entryGetText $ guiInPlayer gui
     return IntermediateCfg
         { host   = foo txtHost
         , port   = foo txtPort

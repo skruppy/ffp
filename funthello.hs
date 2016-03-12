@@ -24,45 +24,102 @@ import PP as PP
 import Paths_funthello (version)
 import Data.Version (showVersion)
 import System.Console.ANSI
+import System.Exit
 
 -- The name speaks for it self. Here you are looking at the beautiful main-l↺↺p.
-(↺) hdl (SmEnd gameData winner) = putStrLn ("OK")
-(↺) hdl (SmError msg)           = putStrLn ("FAILED: "++msg)
+(↺) :: Handle -> StepResult -> IO (Either String (GameData, Maybe Int))
+(↺) hdl (SmEnd gameData winner) = return $ Right (gameData, winner)
+(↺) hdl (SmError msg)           = return $ Left msg
 (↺) hdl (SmOk s o)              = do
     i <- converse hdl o
     let (s', io) = smStep s i
-    maybio io
+    io
     (↺) hdl s'
 
 
-play Nothing _ _ _ = putStrLn ("Missing hostname")
-play _ Nothing _ _ = putStrLn ("Missing port")
-play _ _ Nothing _ = putStrLn ("Missing game ID")
-play (Just host') (Just port') (Just gameId') player' = do
-    -- Get socket
-    socket <- Net.connect host' port'
+play gameId' player' ai socket = do
     -- Convert socket to unbuffered handle
-    hdl    <- socketToHandle socket ReadWriteMode
+    hdl <- socketToHandle socket ReadWriteMode
     hSetBuffering hdl NoBuffering
-    mVarField <- newEmptyMVar
-    mVarGameData <- newEmptyMVar
-    forkIO $ GG.createGameGUI mVarField mVarGameData
+    
     -- Main loop
-    let state = smCreate $ S.Cfg {
+    res <- (↺) hdl $ smCreate S.Cfg {
           S.gameId = gameId'
         , S.player = player'
-        , S.ai     = \gameData field time -> ((KI.getNextMove mVarField mVarGameData field gameData) , Just $ PP.prettyPrint field)
+        , S.ai     = ai
         }
-    input <- converse hdl []
-    let (state', io) = smStep state input
-    maybio io
-    (↺) hdl state'
     
     -- So close!
     hClose hdl
+    return res
 
 
-align text n = text ++ (replicate (n - (length text)) ' ')
+finalizeCfg :: IntermediateCfg -> IO (Either String (String, Maybe Int, Socket))
+finalizeCfg IntermediateCfg { C.host   = Nothing } = return $ Left "Missing hostname"
+finalizeCfg IntermediateCfg { C.port   = Nothing } = return $ Left "Missing port"
+finalizeCfg IntermediateCfg { C.gameId = Nothing } = return $ Left "Missing game ID"
+finalizeCfg IntermediateCfg
+    { C.host   = Just host'
+    , C.port   = Just port'
+    , C.gameId = Just gameId'
+    , C.player =      player'
+    }
+    = do
+    res <- Net.connect host' port'
+    case res of
+        Right socket -> return $ Right (gameId', player', socket)
+        Left msg     -> return $ Left msg
+
+
+getGuiCfg :: Gui -> String -> IO (String, Maybe Int, Socket)
+getGuiCfg gui msg = do
+    -- Get config from GUI
+    cfg <- CG.getCfg gui msg
+    
+    -- Try to make final config
+    res <- finalizeCfg cfg
+    case res of
+        Right finalCfg -> return finalCfg
+        Left  msg      -> getGuiCfg gui msg
+
+
+guiMode cfg = do
+    gui <- CG.createGui cfg
+    (gameId', player', socket) <- getGuiCfg gui ""
+
+    mVarField <- newEmptyMVar
+    mVarGameData <- newEmptyMVar
+    forkIO $ GG.createGameGUI mVarField mVarGameData
+    
+    let ai = \gameData field time -> (
+            AI.getNextMove field gameData
+          , do
+              tryPutMVar mVarField field
+              tryPutMVar mVarGameData gameData
+              PP.prettyPrint field
+          )
+    
+    res <- play gameId' player' ai socket
+    case res of
+        Right _ -> return True
+        Left _ -> return False
+
+
+consoleMode cfg = do
+    res <- finalizeCfg cfg
+    case res of
+        Right (gameId', player', socket) -> do
+            let ai = \gameData field time -> ((AI.getNextMove field gameData) , PP.prettyPrint field)
+            res <- play gameId' player' ai socket
+            case res of
+                Right _ -> return True
+                Left _ -> return False
+        
+        -- Configuration error
+        Left msg -> do
+            putStrLn msg
+            return False
+
 
 main :: IO ()
 main = do
@@ -89,11 +146,14 @@ main = do
     setSGR [Reset]
     putStrLn ""
 
+    let cfg = mergeCfg [argsCfg, defaultCfg]
     progName <- getProgName
-    guiCfg <- if endswith "-gui" progName
-        then let cfg = mergeCfg [argsCfg, defaultCfg] in CG.getCfg cfg
-        else return emptyCfg
     
-    let cfg = mergeCfg [guiCfg, argsCfg, defaultCfg]
+    ret <- if endswith "-gui" progName
+    then guiMode cfg
+    else consoleMode cfg
     
-    play (C.host cfg) (C.port cfg) (C.gameId cfg) (C.player cfg)
+    if ret
+    then exitSuccess
+    else exitFailure
+

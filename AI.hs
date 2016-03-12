@@ -7,11 +7,9 @@
 module AI where
 
 import Data.Tree.Game_tree.Negascout as NS
-import Data.Tree.Game_tree.Game_tree 
+import Data.Tree.Game_tree.Game_tree
 import Data.Array
 import Sm
-import Control.Concurrent.MVar
-import System.IO.Unsafe
 
 alphabet = ['A'..'Z'];
 
@@ -38,15 +36,12 @@ getPlayerColourFromGameData (GameData _ _ _ _ players) = itsMe $ firstItem
         firstItem = players ! 0
 
 
-getNextMove :: (MVar (Array (Int, Int) String)) -> (MVar GameData)-> (Array (Int, Int) String) -> GameData  -> String
-getNextMove mVarField mVarGameData field gameData =
-    if ( t == True)
-        then getMoveFromRNode $ getNextRNode a searchdepth
-        else getMoveFromRNode $ getNextRNode a searchdepth
+getNextMove :: (Array (Int, Int) String) -> GameData  -> String
+getNextMove field gameData =
+    getMoveFromRNode $ getNextRNode a searchdepth
     where
-        a  = (RNode (createWeightedArray pC field) pC pC Nothing)
         pC = getPlayerColourFromGameData gameData
-        t  = unsafePerformIO $ ((tryPutMVar mVarField field)>>(tryPutMVar mVarGameData gameData))
+        a  = (RNode (createWeightedArray pC field) pC pC Nothing)
 
 
 getNextRNode :: RNode -> Int -> RNode
