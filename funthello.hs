@@ -6,31 +6,34 @@
 
 module Main where
 
-import Sm as S
-import Net
 import AI as AI
-import Network.Socket as NS
-import System.IO
 import Conf as C
 import Conf.Args as CA
 import Conf.Gui as CG
-import Data.String.Utils
-import System.Environment
-import Util
-import GameGUI as GG
-import Control.Concurrent.MVar
 import Control.Concurrent
+import Control.Concurrent.MVar
+import Data.String.Utils
+import Data.Version (showVersion)
+import GameGUI as GG
+import Graphics.UI.Gtk
+import Graphics.UI.Gtk.Windows.MessageDialog
+import Net
+import Network.Socket as NS
 import PP as PP
 import Paths_funthello (version)
-import Data.Version (showVersion)
+import Sm as S
 import System.Console.ANSI
+import System.Environment
 import System.Exit
+import System.IO
+import Util
+
 
 -- The name speaks for it self. Here you are looking at the beautiful main-l↺↺p.
-(↺) :: Handle -> StepResult -> IO (Either String (GameData, Maybe Int))
-(↺) hdl (SmEnd gameData winner) = return $ Right (gameData, winner)
-(↺) hdl (SmError msg)           = return $ Left msg
-(↺) hdl (SmOk s o)              = do
+(↺) :: Handle -> StepResult -> IO (Either String (GameData, Maybe Int, Board))
+(↺) hdl (SmEnd gameData winner board) = return $ Right (gameData, winner, board)
+(↺) hdl (SmError msg)                 = return $ Left msg
+(↺) hdl (SmOk s o)                    = do
     i <- converse hdl o
     let (s', io) = smStep s i
     io
@@ -54,7 +57,7 @@ play gameId' player' ai socket = do
     return res
 
 
-finalizeCfg :: IntermediateCfg -> IO (Either String (String, Maybe Int, Socket))
+finalizeCfg :: IntermediateCfg -> IO (Either String (String, Maybe Int, NS.Socket))
 finalizeCfg IntermediateCfg { C.host   = Nothing } = return $ Left "Missing hostname"
 finalizeCfg IntermediateCfg { C.port   = Nothing } = return $ Left "Missing port"
 finalizeCfg IntermediateCfg { C.gameId = Nothing } = return $ Left "Missing game ID"
@@ -71,7 +74,7 @@ finalizeCfg IntermediateCfg
         Left msg     -> return $ Left msg
 
 
-getGuiCfg :: Gui -> String -> IO (String, Maybe Int, Socket)
+getGuiCfg :: Gui -> String -> IO (String, Maybe Int, NS.Socket)
 getGuiCfg gui msg = do
     -- Get config from GUI
     cfg <- CG.getCfg gui msg
@@ -101,8 +104,35 @@ guiMode cfg = do
     
     res <- play gameId' player' ai socket
     case res of
-        Right _ -> return True
-        Left _ -> return False
+        Right (gameData, winner, board) -> do
+            tryPutMVar mVarField board
+            tryPutMVar mVarGameData gameData
+            PP.prettyPrint board
+            
+            window <- messageDialogNew
+                Nothing
+                []
+                MessageError
+                ButtonsOk
+                "Game over"
+            
+            dialogRun window
+            widgetDestroy window
+            
+            return True
+        
+        Left msg -> do
+            window <- messageDialogNew
+                Nothing
+                []
+                MessageError
+                ButtonsOk
+                msg
+            
+            dialogRun window
+            widgetDestroy window
+            
+            return False
 
 
 consoleMode cfg = do

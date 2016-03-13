@@ -17,7 +17,7 @@ import Data.Version
 
 data StepResult
     = SmOk QuallifiedState [String]
-    | SmEnd GameData (Maybe Int)
+    | SmEnd GameData (Maybe Int) (Array (Int, Int)  String)
     | SmError String
       deriving (Eq, Show)
 
@@ -33,6 +33,7 @@ type GameType = String
 type GameName = String
 type MoveTime = Int
 type WinnerId = Int
+type Board    = (Array (Int, Int)  String)
 
 data BoardTransReason
     = Winner Int
@@ -51,19 +52,19 @@ data State
     | PlayerEndState   Major Minor GameType GameName (Array Int (Maybe PlayerItem))
     | IdleState        GameData
     | FieldStartState  GameData BoardTransReason
-    | FieldLineState   GameData BoardTransReason      Int         Int  Int [[String]]
-    | FieldEndState    GameData BoardTransReason                  Int  Int [[String]]
-    | ThinkingState    GameData MoveTime                  (Array (Int, Int)  String)
+    | FieldLineState   GameData BoardTransReason  Int  Int  Int [[String]]
+    | FieldEndState    GameData BoardTransReason       Int  Int [[String]]
+    | ThinkingState    GameData MoveTime               Board
     | MoveState        GameData
-    | QuitState        GameData (Maybe WinnerId)
-    | EndState         GameData (Maybe WinnerId)
+    | QuitState        GameData (Maybe WinnerId)       Board
+    | EndState         GameData (Maybe WinnerId)       Board
     | ErrorState       String
       deriving (Eq, Show)
 
 data Cfg = Cfg
     { gameId :: String
     , player :: Maybe Int
-    , ai     :: GameData -> Array (Int, Int) String -> Int -> ( String , IO () )
+    , ai     :: GameData -> Board -> Int -> ( String , IO () )
     }
 
 instance Show Cfg where
@@ -241,9 +242,9 @@ parseInput (FieldLineState gameData boardTransReason x y curY field) cfg input =
 parseInput (FieldEndState gameData boardTransReason x y field) cfg input =
     if input == "+ ENDFIELD" then
         case boardTransReason of
-            Move time     -> (ThinkingState gameData time f,    ["THINKING"], return ())
-            Winner winner -> (QuitState gameData (Just winner), [],           return ())
-            Draw          -> (QuitState gameData (Nothing),     [],           return ())
+            Move time     -> (ThinkingState gameData time f      , ["THINKING"] , return ())
+            Winner winner -> (QuitState gameData (Just winner) f , []           , return ())
+            Draw          -> (QuitState gameData (Nothing)     f , []           , return ())
     else unexpectedInput "end of board" input
     where
         f = listArray ((1,1), (x,y)) (concat $ transpose field)
@@ -263,13 +264,13 @@ parseInput (MoveState gameData) cfg input =
        else unexpectedInput "acceptance of our move" input
 
 
-parseInput (QuitState gameData winner) cfg input =
+parseInput (QuitState gameData winner field) cfg input =
     if input == "+ QUIT"
-       then (EndState gameData winner, [], return ())
+       then (EndState gameData winner field, [], return ())
        else unexpectedInput "quit" input
 
 
-parseInput (EndState _ _) cfg input = error ("No input line should ever be parsed in the end state, but we still got \""++input++"\"")
+parseInput (EndState _ _ _) cfg input = error ("No input line should ever be parsed in the end state, but we still got \""++input++"\"")
 
 
 parseInput (ErrorState _) cfg input = error ("No input line should ever be parsed in the error state, but we still got \""++input++"\"")
@@ -281,6 +282,6 @@ smCreate cfg = SmOk (QuallifiedState StartState cfg) []
 
 smStep (QuallifiedState s c) input =
     case parseInput s c input of
-        (ErrorState msg           , _      , _ ) -> ( SmError msg                        , return () )
-        (EndState gameData winner , _      , _ ) -> ( SmEnd gameData winner              , return () )
-        (s'                       , output , io) -> ( SmOk (QuallifiedState s' c) output , io        )
+        (ErrorState msg                 , _      , _ ) -> ( SmError msg                        , return () )
+        (EndState gameData winner field , _      , _ ) -> ( SmEnd gameData winner field        , return () )
+        (s'                             , output , io) -> ( SmOk (QuallifiedState s' c) output , io        )

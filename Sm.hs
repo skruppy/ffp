@@ -4,6 +4,6 @@
 -- day, and you think this stuff is worth it, you can buy me a beer in return.
 --                                                     -- Albatrouss and Skruppy
 
-module Sm (StepResult(..),Cfg(..),GameData(..),PlayerItem(..),smCreate,smStep) where
+module Sm (StepResult(..),Cfg(..),GameData(..),PlayerItem(..),Board,smCreate,smStep) where
 
 import Sm.Internal

@@ -10,7 +10,7 @@ import Test.Hspec
 import Sm.Internal
 import Data.Array
 
-testAi gameData field time = ("test" , Nothing)
+testAi gameData field time = ("test" , return ())
 cfg = Cfg {gameId = "GameId", player = Just 1, ai = testAi}
 
 testPlayers = array (0, 1) [
@@ -45,9 +45,7 @@ testStep result     []     = result
 testStep result     _      = result
 
 
-sm (x:xs) cfg = testStep s xs
-    where
-        (s, _) = smStep (smCreate cfg) x
+sm xs cfg = testStep (smCreate cfg) xs
 
 
 main :: IO ()
@@ -381,13 +379,13 @@ main = hspec $ do
             parseInput (
                     FieldEndState gameData Draw 3 2
                     ([["7","11","13"],["2","3","5"]]) )
-                cfg "+ ENDFIELD" `stateShouldBe` (QuitState gameData Nothing, [])
+                cfg "+ ENDFIELD" `stateShouldBe` (QuitState gameData Nothing field, [])
         
         it "Valid input (quit)" $ do
             parseInput (
                     FieldEndState gameData (Winner 0) 3 2
                     ([["7","11","13"],["2","3","5"]]) )
-                cfg "+ ENDFIELD" `stateShouldBe` (QuitState gameData (Just 0), [])
+                cfg "+ ENDFIELD" `stateShouldBe` (QuitState gameData (Just 0) field, [])
             
         it "Invalid input" $ do
             parseInput (FieldEndState gameData (Move 3000) 3 2 [["7","11","13"],["2","3","5"]]) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected end of board, but got \"+ asd\"", [])
@@ -411,10 +409,10 @@ main = hspec $ do
             
     describe "Parsing in player end state (+ QUIT)" $ do
         it "Valid input" $ do
-            parseInput (QuitState gameData (Just 0)) cfg "+ QUIT" `stateShouldBe` (EndState gameData (Just 0), [])
+            parseInput (QuitState gameData (Just 0) field) cfg "+ QUIT" `stateShouldBe` (EndState gameData (Just 0) field, [])
             
         it "Invalid input" $ do
-            parseInput (QuitState gameData (Just 0)) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected quit, but got \"+ asd\"", [])
+            parseInput (QuitState gameData (Just 0) field) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected quit, but got \"+ asd\"", [])
             
             
 
@@ -433,40 +431,20 @@ main = hspec $ do
                 "+ WAIT", -- OKWAIT
                 "+ WAIT", -- OKWAIT
                 "+ MOVE 3000",
-                "+ FIELD 12,12",
-                "+ 12 * * * * * * * * * * * *",
-                "+ 11 * * * * * * * * * * * *",
-                "+ 10 * * * * * * * * * * * *",
-                "+ 9 * * * * * * * * * * * *",
-                "+ 8 * * * * * * * * * * * *",
-                "+ 7 * * * * * W B * * * * *",
-                "+ 6 * * * * * B W * * * * *",
-                "+ 5 * * * * * * * * * * * *",
-                "+ 4 * * * * * * * * * * * *",
-                "+ 3 * * * * * * * * * * * *",
-                "+ 2 * * * * * * * * * * * *",
-                "+ 1 * * * * * * * * * * * *",
+                "+ FIELD 3,2",
+                "+ 2 2 3 5",
+                "+ 1 7 11 13",
                 "+ ENDFIELD", -- THINKING
                 "+ OKTHINK", -- PLAY ...
                 "+ MOVEOK",
                 "+ WAIT", -- OKWAIT
                 "+ WAIT", -- OKWAIT
                 "+ GAMEOVER 0 Hans Peter",
-                "+ FIELD 12,12",
-                "+ 12 * * * * * * * * * * * *",
-                "+ 11 * * * * * * * * * * * *",
-                "+ 10 * * * * * * * * * * * *",
-                "+ 9 * * * * * * * * * * * *",
-                "+ 8 * * * * * * * * * * * *",
-                "+ 7 * * * * * W B * * * * *",
-                "+ 6 * * * * * B W * * * * *",
-                "+ 5 * * * * * * * * * * * *",
-                "+ 4 * * * * * * * * * * * *",
-                "+ 3 * * * * * * * * * * * *",
-                "+ 2 * * * * * * * * * * * *",
-                "+ 1 * * * * * * * * * * * *",
+                "+ FIELD 3,2",
+                "+ 2 2 3 5",
+                "+ 1 7 11 13",
                 "+ ENDFIELD",
-                "+ QUIT"] cfg `shouldBe` SmEnd gameData (Just 1)
+                "+ QUIT"] cfg `shouldBe` SmEnd gameData (Just 1) field
                 
         it "Valid input (instant gameover)" $ do
             sm [
@@ -479,13 +457,11 @@ main = hspec $ do
                 "+ 1 Horst 1",
                 "+ ENDPLAYERS",
                 "+ GAMEOVER 0 Hans Peter",
-                "+ FIELD 4,4",
-                "+ 4 a b c d",
-                "+ 3 e f g h",
-                "+ 2 i j k l",
-                "+ 1 m n o p",
+                "+ FIELD 3,2",
+                "+ 2 2 3 5",
+                "+ 1 7 11 13",
                 "+ ENDFIELD",
-                "+ QUIT"] cfg `shouldBe` SmEnd gameData (Just 1)
+                "+ QUIT"] cfg `shouldBe` SmEnd gameData (Just 1) field
                 
         it "Invalid input (missing last field)" $ do
             sm [
@@ -498,10 +474,8 @@ main = hspec $ do
                 "+ 1 Horst 1",
                 "+ ENDPLAYERS",
                 "+ GAMEOVER 0 Hans Peter",
-                "+ FIELD 4,4",
-                "+ 4 a b c d",
-                "+ 3 e f g h",
-                "+ 2 i j k l",
+                "+ FIELD 3,2",
+                "+ 2 2 3 5",
                 "+ ENDFIELD",
                 "+ QUIT"] cfg `shouldBe` SmError "Protocoll error: Expected board row, but got \"+ ENDFIELD\""
                 
@@ -516,12 +490,10 @@ main = hspec $ do
                 "+ 1 Horst 1",
                 "+ ENDPLAYERS",
                 "+ GAMEOVER 0 Hans Peter",
-                "+ FIELD 4,4",
-                "+ 3 e f g h",
-                "+ 2 i j k l",
-                "+ 1 m n o p",
+                "+ FIELD 3,2",
+                "+ 1 7 11 13",
                 "+ ENDFIELD",
-                "+ QUIT"] cfg `shouldBe` SmError "Unexpected row number. Caussed by \"+ 3 e f g h\""
+                "+ QUIT"] cfg `shouldBe` SmError "Unexpected row number. Caussed by \"+ 1 7 11 13\""
                 
         it "Invalid input (missing other players)" $ do
             sm [
@@ -533,11 +505,9 @@ main = hspec $ do
                 "+ TOTAL 2",
                 "+ ENDPLAYERS",
                 "+ GAMEOVER 0 Hans Peter",
-                "+ FIELD 4,4",
-                "+ 4 a b c d",
-                "+ 3 e f g h",
-                "+ 2 i j k l",
-                "+ 1 m n o p",
+                "+ FIELD 3,2",
+                "+ 2 2 3 5",
+                "+ 1 7 11 13",
                 "+ ENDFIELD",
                 "+ QUIT"] cfg `shouldBe` SmError "Protocoll error: Expected oponent info, but got \"+ ENDPLAYERS\""
                 
@@ -553,11 +523,9 @@ main = hspec $ do
                 "+ 1 Horst 1",
                 "+ ENDPLAYERS",
                 "+ GAMEOVER 0 Hans Peter",
-                "+ FIELD 4,4",
-                "+ 4 a b c d",
-                "+ 3 e f g h",
-                "+ 2 i j k l",
-                "+ 1 m n o p",
+                "+ FIELD 3,2",
+                "+ 2 2 3 5",
+                "+ 1 7 11 13",
                 "+ ENDFIELD",
                 "+ QUIT"] cfg `shouldBe` SmError "Player already defined. Caussed by \"+ 1 Horst 1\""
                 
@@ -573,10 +541,8 @@ main = hspec $ do
                 "+ 2 Player 1 1",
                 "+ ENDPLAYERS",
                 "+ GAMEOVER 0 Hans Peter",
-                "+ FIELD 4,4",
-                "+ 4 a b c d",
-                "+ 3 e f g h",
-                "+ 2 i j k l",
-                "+ 1 m n o p",
+                "+ FIELD 3,2",
+                "+ 2 2 3 5",
+                "+ 1 7 11 13",
                 "+ ENDFIELD",
                 "+ QUIT"] cfg `shouldBe` SmError "Protocoll error: Expected end of oponent list, but got \"+ 2 Player 1 1\""
