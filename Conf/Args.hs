@@ -43,6 +43,7 @@ argParseCfg = IntermediateCfg <$> (
      <> help    "Player number (0, 1, ..)"
       )
 
+getCfg :: IO (IntermediateCfg)
 getCfg = do
     cfg <- execParser $ info
         (helper <*> argParseCfg)

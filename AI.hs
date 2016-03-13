@@ -11,14 +11,17 @@ import Data.Tree.Game_tree.Game_tree
 import Data.Array
 import Sm
 
+alphabet :: [Char]
 alphabet = ['A'..'Z'];
 
+directions :: [(Int,Int)]
 directions = [
     (-1,-1) , (-1, 0) , (-1, 1),
     ( 0,-1) ,           ( 0, 1),
     ( 1,-1) , ( 1, 0) , ( 1, 1)]
 
-searchdepth = 4
+searchdepth :: Int
+searchdepth = 5 
 
 data RNode = RNode
     { gamefield   :: (Array (Int, Int) (Int, String))
@@ -118,7 +121,7 @@ lookInDirectionFrom field pT (r,c) (dirRow, dirCol) = if ((field ! (r,c)) == ( 0
     where   checkNext nR nC = ((nR <= ubR) && (nC <= ubC) && (nR >=lbR) && (nC >= lbC))
             countIt nR' nC' acc = if (checkNext nR' nC')            then
                     if ((field ! (nR', nC')) == (0,"*"))            then 0      else
-                    if ((getColor nR' nC') == pT)             then acc    else
+                    if ((getColor nR' nC') == pT)                   then acc    else
                     countIt (nR'+dirRow) (nC'+dirCol) (acc +1)                  else 0
                     
             ((lbR,lbC),(ubR, ubC)) = bounds field

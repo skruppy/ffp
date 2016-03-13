@@ -89,12 +89,14 @@ data GameData = GameData
     , players     :: Array Int PlayerItem
     } deriving (Eq, Show)
 
-
+unexpectedInput :: [Char] -> String -> (State, [a], IO ())
 unexpectedInput expected ('-':input) = (ErrorState ("Server error:"++input++" (expected "++expected++")"), [], return ())
 unexpectedInput expected (input)     = (ErrorState ("Protocoll error: Expected "++expected++", but got \""++input++"\""), [], return ())
 
+constraintError :: String -> String -> (State, [a], IO())
 constraintError msg input = (ErrorState (msg++". Caussed by \""++input++"\""), [], return ())
 
+parseInput :: State -> Cfg -> String-> (State, [String], IO ())
 parseInput StartState cfg input =
     case map read xs of
        [major, minor] | major == clientMajor -> (VersionState major minor, ["VERSION "++(showVersion version)], return ())
@@ -281,7 +283,7 @@ parseInput (ErrorState _) cfg input = error ("No input line should ever be parse
 smCreate :: Cfg -> StepResult
 smCreate cfg = SmOk (QuallifiedState StartState cfg) []
 
-
+smStep :: QuallifiedState -> String -> (StepResult, IO ())
 smStep (QuallifiedState s c) input =
     case parseInput s c input of
         (ErrorState msg                 , _      , _ ) -> ( SmError msg                        , return () )
