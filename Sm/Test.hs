@@ -10,12 +10,12 @@ import Test.Hspec
 import Sm.Internal
 import Data.Array
 
-testAi gameData field time = ("test" , return ())
+testAi gameId gameData field time = ("test" , return ())
 cfg = Cfg
     { gameId           = "GameId"
     , player           = Just 1
-    , gameDataComplete = \_ -> return ()
-    , preAi            = \_ _ _ -> return ()
+    , gameDataComplete = \_ _ -> return ()
+    , preAi            = \_ _ _ _ -> return ()
     , ai               = testAi
     }
 

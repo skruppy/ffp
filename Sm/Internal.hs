@@ -64,9 +64,9 @@ data State
 data Cfg = Cfg
     { gameId           :: String
     , player           :: Maybe Int
-    , gameDataComplete :: GameData -> IO ()
-    , preAi            :: GameData -> Board -> Int -> IO ()
-    , ai               :: GameData -> Board -> Int -> ( String , IO () )
+    , gameDataComplete :: String -> GameData -> IO ()
+    , preAi            :: String -> GameData -> Board -> Int -> IO ()
+    , ai               :: String -> GameData -> Board -> Int -> ( String , IO () )
     }
 
 instance Show Cfg where
@@ -177,7 +177,7 @@ parseInput (PlayerLineState major minor gameType gameName players playerCnt) cfg
 
 parseInput (PlayerEndState major minor gameType gameName players) cfg input =
     if input == "+ ENDPLAYERS"
-       then (IdleState gameData, [], gameDataComplete cfg gameData)
+       then (IdleState gameData, [], gameDataComplete cfg (gameId cfg) gameData)
        else unexpectedInput "end of oponent list" input
     where
         gameData = GameData
@@ -244,7 +244,7 @@ parseInput (FieldLineState gameData boardTransReason x y curY field) cfg input =
 parseInput (FieldEndState gameData boardTransReason x y field) cfg input =
     if input == "+ ENDFIELD" then
         case boardTransReason of
-            Move time     -> (ThinkingState gameData time f      , ["THINKING"] , preAi cfg gameData f time)
+            Move time     -> (ThinkingState gameData time f      , ["THINKING"] , preAi cfg (gameId cfg) gameData f time)
             Winner winner -> (QuitState gameData (Just winner) f , []           , return ())
             Draw          -> (QuitState gameData (Nothing)     f , []           , return ())
     else unexpectedInput "end of board" input
@@ -257,7 +257,7 @@ parseInput (ThinkingState gameData time field) cfg input =
        then (MoveState gameData, ["PLAY "++move], io)
        else unexpectedInput "OKTHINK" input
     where
-        (move, io) = ai cfg gameData field time
+        (move, io) = ai cfg (gameId cfg) gameData field time
 
 
 parseInput (MoveState gameData) cfg input =

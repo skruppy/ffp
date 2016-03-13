@@ -12,6 +12,7 @@ import Conf.Args as CA
 import Conf.Gui as CG
 import Control.Concurrent
 import Control.Concurrent.MVar
+import Control.Monad
 import Data.String.Utils
 import Data.Array
 import Data.Version (showVersion)
@@ -74,12 +75,38 @@ finalizeCfg IntermediateCfg
         Left msg     -> return $ Left msg
 
 
+printGameData :: String -> GameData -> IO ()
+printGameData gameId gameData = do
+    putStrLn $ "Server Version: "++(show $ serverMajor gameData)++"."++(show $ serverMinor gameData)
+    putStrLn $ "     Game Type: "++(gameType gameData)
+    putStrLn $ "     Game Name: "++(gameName gameData)
+    putStrLn $ "       Game Id: "++(gameId)++" (Watch: http://sysprak.priv.lab.nm.ifi.lmu.de/sysprak/"++(gameType gameData)++"/"++(gameId)++")"
+    putStrLn $ ""
+    putStrLn $ "Players:"
+    mapM_ printPlayer $ assocs $ players gameData
+    
+    where
+        printPlayer (i, (PlayerItem playerName' isReady' itsMe')) = do
+            putStr $ "   "++(show i)++": "
+            setSGR $
+                if      itsMe'   then [SetColor Foreground Vivid Green, SetConsoleIntensity BoldIntensity]
+                else if isReady' then [SetColor Foreground Dull Green]
+                                 else [SetColor Foreground Vivid Yellow]
+            putStr playerName'
+            setSGR [Reset]
+            
+            putStrLn $
+                if      itsMe'   then " (You)"
+                else if isReady' then " (Ready)"
+                                 else " (Play: http://sysprak.priv.lab.nm.ifi.lmu.de/sysprak/"++(gameType gameData)++"/"++(gameId)++"#"++(show i)++")"
+
+
 {-== CONSOLE MODE ==-}
 blaa gameId' player' socket = do
     mVarField <- newEmptyMVar
     mVarGameData <- newEmptyMVar
     
-    let ai = \gameData board time -> (AI.getNextMove board gameData, do
+    let ai = \gameId gameData board time -> (AI.getNextMove board gameData, do
             tryPutMVar mVarField board
             tryPutMVar mVarGameData gameData
             PP.prettyPrint board)
@@ -88,8 +115,8 @@ blaa gameId' player' socket = do
         let cfg = S.Cfg {
               S.gameId           = gameId'
             , S.player           = player'
-            , S.gameDataComplete = \_ -> return ()
-            , S.preAi            = \_ _ _ -> return ()
+            , S.gameDataComplete = \_ _ -> return ()
+            , S.preAi            = \_ _ _ _ -> return ()
             , S.ai               = ai
             }
         res <- play cfg socket
@@ -126,12 +153,16 @@ guiMode cfg = do
 
 
 {-== CONSOLE MODE ==-}
-consolePreAi gameData board time = do
+consoleGameDataComplete gameId gameData = do
+    printGameData gameId gameData
+
+
+consolePreAi gameId gameData board time = do
     putStrLn $ "Now I can think "++(show time)++"ms about the best move on the following board:"
     PP.prettyPrint board
 
 
-consoleAi gameData board time =
+consoleAi gameId gameData board time =
     (move, do
         putStrLn $ "I decided to do: "++move
     )
@@ -145,7 +176,7 @@ consoleMode cfg = do
             let cfg' = S.Cfg {
                   S.gameId           = gameId'
                 , S.player           = player'
-                , S.gameDataComplete = \_ -> return ()
+                , S.gameDataComplete = consoleGameDataComplete
                 , S.preAi            = consolePreAi
                 , S.ai               = consoleAi
                 }
