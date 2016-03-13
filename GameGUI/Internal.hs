@@ -27,7 +27,6 @@ data Gui = Gui {
     , guiLbGameType  :: Label
     , guiLbGameName  :: Label
     , guiLbGameId    :: LinkButton
-    , guiLbStatus    :: Label
     }
 
 
@@ -46,7 +45,7 @@ guiNew = do
     contWindow <- hBoxNew False 15
     contBoard  <- tableNew 1 1 True
     contInfo   <- vBoxNew False 6
-
+    
     boxPackStart contWindow contBoard PackGrow 0
     boxPackStart contWindow contInfo PackNatural 0
     
@@ -58,8 +57,6 @@ guiNew = do
     buttonSetAlignment lbGameId (0.0, 0.5)
     set lbGameId [widgetCanDefault := False, widgetCanFocus := False]
     boxPackStart contInfo lbGameId PackNatural 0
-    
-    lbGameStatus <- addSimpleInfo contInfo "Game Status"
     
     addInfoHeader contInfo "Players"
     contPlayers   <- vBoxNew False 6
@@ -76,7 +73,6 @@ guiNew = do
         , guiLbGameType  = lbGameType
         , guiLbGameName  = lbGameName
         , guiLbGameId    = lbGameId
-        , guiLbStatus    = lbGameStatus
         }
 
 
@@ -113,15 +109,25 @@ poll gui = do
 
 update :: Gui -> Command -> IO ()
 update gui (ShowGameData gameId (GameData serverMajor serverMinor gameType gameName players)) = do
+    -- Game type
     labelSetText (guiLbGameType gui) $ "    " ++ gameType
+    
+    -- Game name
     labelSetText (guiLbGameName gui) $ "    " ++ gameName
+    
+    -- Game ID
     buttonSetLabel (guiLbGameId gui) $ "    " ++ gameId
     set (guiLbGameId gui) [linkButtonURI := "http://sysprak.priv.lab.nm.ifi.lmu.de/sysprak/"++gameType++"/"++gameId]
     
-    set (guiWindow gui) [windowTitle := "Playing "++gameName++" a game of "++gameType++" ("++gameId++")"]
+    -- Players
+    let cont = (guiContPlayers gui)
+    odlWidgets <- containerGetChildren cont
+    mapM (containerRemove cont) odlWidgets
+    mapM_ (addPlayer cont gameId gameType) $ assocs players
+    widgetShowAll cont
     
-    mapM_ (addPlayer (guiContPlayers gui) gameId gameType) $ assocs players
-    widgetShowAll (guiContPlayers gui)
+    -- Window title (contains everything™)
+    set (guiWindow gui) [windowTitle := "Playing "++gameName++" a game of "++gameType++" ("++gameId++")"]
 
 
 update gui (ShowBoard board) = do
@@ -162,21 +168,7 @@ update gui (ShowMessage msgType msg) = do
     widgetShowAll window
 
 
-addPlayer container gameId gameType (i, player) = do
-    label <- linkButtonNewWithLabel url $ prefix++(playerName player)++suffix
-    buttonSetAlignment label (0.0, 0.5)
-    set label [widgetCanDefault := False, widgetCanFocus := False]
-    boxPackStart container label PackNatural 0
-    
-    where
-        url = "http://sysprak.priv.lab.nm.ifi.lmu.de/sysprak/"++gameType++"/"++gameId++"#"++(show i)
-        prefix = (show i) ++ ": "
-        suffix = if      itsMe player   then " (You)"
-                 else if isReady player then " (Ready)"
-                                        else ""
-
-
-
+{-== BOARD ==-}
 addLabels :: Table -> Int -> Int -> IO ()
 addLabels table sizeX sizeY = do
     let labelsAlpha = map (:[]) $ take sizeX ['A'..'Z']
@@ -203,21 +195,25 @@ createLabels table coord labelStrings = do
 createButtons :: Table -> Board -> IO [Button]
 createButtons table field = do
     let fieldIndi = indices field
-    buttons <- mapM (createButton table field) fieldIndi
-    return buttons
+    mapM (createButton table field) fieldIndi
 
 
 createButton :: Table -> Board -> (Int, Int) -> IO Button
-createButton table field (r,c) = do
-    let s = if ((field ! (r,c)) == "W") then "⛀" else if ((field ! (r,c)) == "B") then "⛂" else " "
-    let ((_,_),(_, size)) = bounds field
-    let r' = r +1
-    let c' = size - c +1
+createButton table field (row,col) = do
+    -- Get display string
+    let s = if ((field ! (row,col)) == "W") then "⛀" else if ((field ! (row,col)) == "B") then "⛂" else " "
+    
+    -- Calculate actual display position
+    let ((_,_),(_, sizeY)) = bounds field
+    let row' = row + 1
+    let col' = sizeY - col + 1
+    
     button <- buttonNewWithLabel s
-    tableAttachDefaults table button (r'-1) (r') (c'-1) (c')
+    tableAttachDefaults table button  (row'-1) (row')  (col'-1) (col')
     return button
 
 
+{-== GAME DATA ==-}
 addInfoHeader :: VBox -> String -> IO ()
 addInfoHeader container description = do
     label <- labelNew $ Just ""
@@ -235,3 +231,18 @@ addSimpleInfo container description = do
     boxPackStart container lbValue PackNatural 0
     
     return lbValue
+
+
+addPlayer :: VBox -> String -> String -> (Int, PlayerItem) -> IO ()
+addPlayer container gameId gameType (i, player) = do
+    label <- linkButtonNewWithLabel url $ prefix++(playerName player)++suffix
+    buttonSetAlignment label (0.0, 0.5)
+    set label [widgetCanDefault := False, widgetCanFocus := False]
+    boxPackStart container label PackNatural 0
+    
+    where
+        url = "http://sysprak.priv.lab.nm.ifi.lmu.de/sysprak/"++gameType++"/"++gameId++"#"++(show i)
+        prefix = (show i) ++ ": "
+        suffix = if      itsMe player   then " (You)"
+                 else if isReady player then " (Ready)"
+                                        else ""

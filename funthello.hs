@@ -108,6 +108,7 @@ guiPreAi gui gameId gameData board time = do
     prettyPrint board
     updateBoard gui board
 
+
 guiAi :: Gui -> String -> GameData -> Array (Int,Int) String -> Int -> (String, IO () )
 guiAi gui gameId gameData board time =
     (move, do
@@ -117,6 +118,7 @@ guiAi gui gameId gameData board time =
     )
     where
         (move, nextBoard) = AI.getNextMove board gameData
+
 
 startMainGui :: (String, Maybe Int, NS.Socket) -> IO Bool
 startMainGui (gameId', player', socket) = do
@@ -175,6 +177,7 @@ startMainGui (gameId', player', socket) = do
     -- The GUI always exits successfully (to big to fail :)
     return True
 
+
 guiMode :: IntermediateCfg -> IO Bool
 guiMode cfg = do
     -- Init GTK once before any other GTK call
@@ -192,10 +195,12 @@ consoleGameDataComplete :: String -> GameData -> IO ()
 consoleGameDataComplete gameId gameData = do
     printGameData gameId gameData
 
+
 consolePreAi :: String -> GameData -> Array (Int,Int) String -> Int -> IO ()
 consolePreAi gameId gameData board time = do
     putStrLn $ "Now I can think "++(show time)++"ms about the best move on the following board:"
     prettyPrint board
+
 
 consoleAi :: String -> GameData -> Array (Int,Int) String -> Int -> (String ,IO ())
 consoleAi gameId gameData board time =
@@ -205,6 +210,7 @@ consoleAi gameId gameData board time =
     )
     where
         (move, nextBoard) = AI.getNextMove board gameData
+
 
 consoleMode :: IntermediateCfg -> IO Bool
 consoleMode cfg = do
@@ -294,4 +300,3 @@ main = do
     if ret
     then exitSuccess
     else exitFailure
-

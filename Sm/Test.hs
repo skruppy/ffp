@@ -10,7 +10,10 @@ import Data.Array
 import Sm.Internal
 import Test.Hspec
 
+
 testAi gameId gameData field time = ("test" , return ())
+
+
 cfg = Cfg
     { gameId           = "GameId"
     , player           = Just 1
@@ -19,9 +22,11 @@ cfg = Cfg
     , ai               = testAi
     }
 
+
 testPlayers = array (0, 1) [
     (0, Just PlayerItem {playerName = "Hans Peter" , isReady = True , itsMe = True }),
     (1, Just PlayerItem {playerName = "Horst"      , isReady = True , itsMe = False})]
+
 
 gameData = GameData
     { serverMajor = 1
@@ -33,15 +38,18 @@ gameData = GameData
         ,(1, PlayerItem {playerName = "Horst"      , isReady = True , itsMe = False})]
     }
 
+
 field = array ((1,1), (3,2)) [
     ((1,2), "2"), ((2,2), "3"), ((3,2), "5"),
     ((1,1), "7"), ((2,1),"11"), ((3,1),"13")]
 
 
 -- Cut away IO from parser result, to be able to compare/test it
+stateShouldBe :: (State, [String], IO ()) -> (State, [String]) -> Expectation
 stateShouldBe (a, b, _) (a', b') = (a, b) `shouldBe` (a', b')
 
 
+testStep :: StepResult -> [String] -> StepResult
 testStep (SmOk s o) (x:xs) = testStep s' xs
     where
         (s', _) = smStep s x
@@ -51,6 +59,7 @@ testStep result     []     = result
 testStep result     _      = result
 
 
+sm :: [String] -> Cfg -> StepResult
 sm xs cfg = testStep (smCreate cfg) xs
 
 
