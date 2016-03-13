@@ -77,56 +77,46 @@ finalizeCfg IntermediateCfg
         Left msg     -> return $ Left msg
 
 
+blaa gameId' player' socket = do
+    mVarField <- newEmptyMVar
+    mVarGameData <- newEmptyMVar
+    
+    let ai = \gameData board time -> (AI.getNextMove board gameData, do
+            tryPutMVar mVarField board
+            tryPutMVar mVarGameData gameData
+            PP.prettyPrint board)
+    
+    forkIO $ do
+        res <- play gameId' player' ai socket
+        case res of
+            Right (gameData, winner, board) -> do
+                tryPutMVar mVarField board
+                tryPutMVar mVarGameData gameData
+                PP.prettyPrint board
+                case winner of
+                     Just winner' -> do
+                        let winner'' = (players gameData) ! winner'
+                        if itsMe winner''
+                            then putStrLn "You won"
+                            else putStrLn $ (playerName winner'') ++ " won"
+                     Nothing -> do
+                         putStrLn "The game ended in a draw"
+            
+            -- Error in game
+            Left msg -> do
+                putStrLn msg
+        return ()
+    
+    GG.createGameGUI mVarField mVarGameData
+
 guiMode cfg = do
     initGUI
     cfg' <- CG.getCfg cfg (\cfg' -> finalizeCfg cfg')
-    putStrLn $ show $ cfg'
     
     case cfg' of
         Just (gameId', player', socket) -> do
-            mVarField <- newEmptyMVar
-            mVarGameData <- newEmptyMVar
-            forkIO $ GG.createGameGUI mVarField mVarGameData
-            
-            let ai = \gameData field time -> (
-                    AI.getNextMove field gameData
-                  , do
-                      tryPutMVar mVarField field
-                      tryPutMVar mVarGameData gameData
-                      PP.prettyPrint field
-                  )
-            
-            res <- play gameId' player' ai socket
-            case res of
-                Right (gameData, winner, board) -> do
-                    tryPutMVar mVarField board
-                    tryPutMVar mVarGameData gameData
-                    PP.prettyPrint board
-                    
-                    window <- messageDialogNew
-                        Nothing
-                        []
-                        MessageError
-                        ButtonsOk
-                        "Game over"
-                    
-                    dialogRun window
-                    widgetDestroy window
-                    
-                    return True
-                
-                Left msg -> do
-                    window <- messageDialogNew
-                        Nothing
-                        []
-                        MessageError
-                        ButtonsOk
-                        msg
-                    
-                    dialogRun window
-                    widgetDestroy window
-                    
-                    return False
+            blaa gameId' player' socket
+            return True
         Nothing -> return True
 
 
@@ -134,7 +124,7 @@ consoleMode cfg = do
     res <- finalizeCfg cfg
     case res of
         Right (gameId', player', socket) -> do
-            let ai = \gameData field time -> ((AI.getNextMove field gameData) , PP.prettyPrint field)
+            let ai = \gameData board time -> ((AI.getNextMove board gameData) , PP.prettyPrint board)
             res <- play gameId' player' ai socket
             
             case res of

@@ -15,10 +15,10 @@ import Control.Concurrent.MVar
 
 
 createGameGUI :: (MVar (Array (Int, Int) String))-> (MVar GameData) -> IO ()
-createGameGUI mVField  mVGameData = do 
-    initGUI
+createGameGUI mVField  mVGameData = do
     field <- takeMVar mVField
     gameData <- takeMVar mVGameData
+    
     let getGameTypeAndName (GameData _ _ gt gn _) = gt ++ " : " ++ gn
     let title = getGameTypeAndName gameData
     window <- windowNew
@@ -27,11 +27,13 @@ createGameGUI mVField  mVGameData = do
     
     let ((_,_),(_,size)) = bounds field
     layoutTable <- tableNew 2 1 False
+    
     -- game field
     gameTable <- tableNew (size +1) (size +1) True 
     tableAttachDefaults layoutTable gameTable 0 1 0 1
     buttons <- createButtons field gameTable
     addLabels gameTable size
+    
     -- player field
     playerTable <- tableNew (size+1) 1 True
     let getNameFromPlayer (PlayerItem s _ itsMe) = if itsMe then ("  <b>" ++ s  ++ "</b>") else s
