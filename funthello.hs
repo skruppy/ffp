@@ -13,6 +13,7 @@ import Conf.Gui as CG
 import Control.Concurrent
 import Control.Concurrent.MVar
 import Data.String.Utils
+import Data.Array
 import Data.Version (showVersion)
 import GameGUI as GG
 import Graphics.UI.Gtk
@@ -135,9 +136,24 @@ consoleMode cfg = do
         Right (gameId', player', socket) -> do
             let ai = \gameData field time -> ((AI.getNextMove field gameData) , PP.prettyPrint field)
             res <- play gameId' player' ai socket
+            
             case res of
-                Right _ -> return True
-                Left _ -> return False
+                Right (gameData, winner, board) -> do
+                    PP.prettyPrint board
+                    case winner of
+                         Just winner' -> do
+                            let winner'' = (players gameData) ! winner'
+                            if itsMe winner''
+                                then putStrLn "You won"
+                                else putStrLn $ (playerName winner'') ++ " won"
+                         Nothing -> do
+                             putStrLn "The game ended in a draw"
+                    return True
+                
+                -- Error in game
+                Left msg -> do
+                    putStrLn msg
+                    return False
         
         -- Configuration error
         Left msg -> do
