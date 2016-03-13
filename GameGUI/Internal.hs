@@ -20,13 +20,14 @@ data Command
 
 
 data Gui = Gui {
-      guiChannel    :: MVar Command
-    , guiWindow     :: Window
-    , guiContBoard  :: Table
-    , guiLbGameType :: Label
-    , guiLbGameName :: Label
-    , guiLbGameId   :: Label
-    , guiLbStatus   :: Label
+      guiChannel     :: MVar Command
+    , guiWindow      :: Window
+    , guiContBoard   :: Table
+    , guiContPlayers :: VBox
+    , guiLbGameType  :: Label
+    , guiLbGameName  :: Label
+    , guiLbGameId    :: LinkButton
+    , guiLbStatus    :: Label
     }
 
 
@@ -49,23 +50,33 @@ guiNew = do
     boxPackStart contWindow contBoard PackGrow 0
     boxPackStart contWindow contInfo PackNatural 0
     
-    
     lbGameType   <- addSimpleInfo contInfo "Game type"
     lbGameName   <- addSimpleInfo contInfo "Game name"
-    lbGameId     <- addSimpleInfo contInfo "Game ID"
+    
+    addInfoHeader contInfo "Game ID"
+    lbGameId <- linkButtonNewWithLabel "" "-"
+    buttonSetAlignment lbGameId (0.0, 0.5)
+    set lbGameId [widgetCanDefault := False, widgetCanFocus := False]
+    boxPackStart contInfo lbGameId PackNatural 0
+    
     lbGameStatus <- addSimpleInfo contInfo "Game Status"
+    
+    addInfoHeader contInfo "Players"
+    contPlayers   <- vBoxNew False 6
+    boxPackStart contInfo contPlayers PackNatural 0
     
     containerAdd window contWindow
     onDestroy window mainQuit
     
     return Gui {
-          guiChannel    = channel
-        , guiWindow     = window
-        , guiContBoard  = contBoard
-        , guiLbGameType = lbGameType
-        , guiLbGameName = lbGameName
-        , guiLbGameId   = lbGameId
-        , guiLbStatus   = lbGameStatus
+          guiChannel     = channel
+        , guiWindow      = window
+        , guiContBoard   = contBoard
+        , guiContPlayers = contPlayers
+        , guiLbGameType  = lbGameType
+        , guiLbGameName  = lbGameName
+        , guiLbGameId    = lbGameId
+        , guiLbStatus    = lbGameStatus
         }
 
 
@@ -104,7 +115,13 @@ update :: Gui -> Command -> IO ()
 update gui (ShowGameData gameId (GameData serverMajor serverMinor gameType gameName players)) = do
     labelSetText (guiLbGameType gui) $ "    " ++ gameType
     labelSetText (guiLbGameName gui) $ "    " ++ gameName
-    labelSetText (guiLbGameId gui)   $ "    " ++ gameId
+    buttonSetLabel (guiLbGameId gui) $ "    " ++ gameId
+    set (guiLbGameId gui) [linkButtonURI := "http://sysprak.priv.lab.nm.ifi.lmu.de/sysprak/"++gameType++"/"++gameId]
+    
+    set (guiWindow gui) [windowTitle := "Playing "++gameName++" a game of "++gameType++" ("++gameId++")"]
+    
+    mapM_ (addPlayer (guiContPlayers gui) gameId gameType) $ assocs players
+    widgetShowAll (guiContPlayers gui)
 
 
 update gui (ShowBoard board) = do
@@ -143,6 +160,21 @@ update gui (ShowMessage msgType msg) = do
         widgetDestroy  window
     
     widgetShowAll window
+
+
+addPlayer container gameId gameType (i, player) = do
+    label <- linkButtonNewWithLabel url $ prefix++(playerName player)++suffix
+    buttonSetAlignment label (0.0, 0.5)
+    set label [widgetCanDefault := False, widgetCanFocus := False]
+    boxPackStart container label PackNatural 0
+    
+    where
+        url = "http://sysprak.priv.lab.nm.ifi.lmu.de/sysprak/"++gameType++"/"++gameId++"#"++(show i)
+        prefix = (show i) ++ ": "
+        suffix = if      itsMe player   then " (You)"
+                 else if isReady player then " (Ready)"
+                                        else ""
+
 
 
 addLabels :: Table -> Int -> Int -> IO ()
