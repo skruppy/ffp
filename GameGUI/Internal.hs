@@ -39,7 +39,7 @@ guiNew = do
     window <- windowNew
     set window [ windowTitle          := "Waiting for input"
                , containerBorderWidth := 5
-               , windowDefaultWidth   := 500
+               , windowDefaultWidth   := 700
                , windowDefaultHeight  := 500
                ]
     
