@@ -117,7 +117,7 @@ guiAi gui gameId gameData board time =
     where
         move = AI.getNextMove board gameData
 
-startMainGui :: (String, Maybe Int, NS.Socket) -> IO ()
+startMainGui :: (String, Maybe Int, NS.Socket) -> IO Bool
 startMainGui (gameId', player', socket) = do
     gui <- guiNew
     
