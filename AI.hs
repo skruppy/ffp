@@ -18,7 +18,7 @@ directions = [
     ( 0,-1) ,           ( 0, 1),
     ( 1,-1) , ( 1, 0) , ( 1, 1)]
 
-searchdepth = -200
+searchdepth = 4
 
 data RNode = RNode
     { gamefield   :: (Array (Int, Int) (Int, String))
@@ -52,6 +52,8 @@ getMoveFromRNode:: RNode -> String
 getMoveFromRNode (RNode _ _ _ (Just (x,y)) ) = (alphabet !! (x-1)) : show y
 getMoveFromRNode (RNode _ _ _ Nothing      ) = ""
 
+getChildren :: RNode -> [RNode]
+getChildren a= children a
 
 instance Game_tree RNode where
     --is_terminal :: RNode -> Bool
@@ -116,7 +118,8 @@ lookInDirectionFrom field pT (r,c) (dirRow, dirCol) = if ((field ! (r,c)) == ( 0
     where   checkNext nR nC = ((nR <= ubR) && (nC <= ubC) && (nR >=lbR) && (nC >= lbC))
             countIt nR' nC' acc = if (checkNext nR' nC')            then
                     if ((field ! (nR', nC')) == (0,"*"))            then 0      else
-                    if ((field ! (nR', nC')) == (1,pT))             then acc    else
+                    if ((getColor nR' nC') == pT)             then acc    else
                     countIt (nR'+dirRow) (nC'+dirCol) (acc +1)                  else 0
                     
             ((lbR,lbC),(ubR, ubC)) = bounds field
+            getColor a b  = snd $ field ! (a,b)
