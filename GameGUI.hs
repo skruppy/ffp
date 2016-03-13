@@ -4,6 +4,6 @@
 -- day, and you think this stuff is worth it, you can buy me a beer in return.
 --                                                     -- Albatrouss and Skruppy
 
-module GameGUI (createGameGUI) where
+module GameGUI (Gui,guiNew,runGui,updateGameData,updateBoard,showGuiMsg) where
 
 import GameGUI.Internal

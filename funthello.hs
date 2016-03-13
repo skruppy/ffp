@@ -101,45 +101,62 @@ printGameData gameId gameData = do
                                  else " (Play: http://sysprak.priv.lab.nm.ifi.lmu.de/sysprak/"++(gameType gameData)++"/"++(gameId)++"#"++(show i)++")"
 
 
-{-== CONSOLE MODE ==-}
+{-== GUI MODE ==-}
+guiPreAi gui gameId gameData board time = do
+    putStrLn $ "Now I can think "++(show time)++"ms about the best move on the following board:"
+    PP.prettyPrint board
+    updateBoard gui board
+
+
+guiAi gui gameId gameData board time =
+    (move, do
+        putStrLn $ "I decided to do: "++move
+        updateBoard gui board
+    )
+    where
+        move = AI.getNextMove board gameData
+
 blaa gameId' player' socket = do
-    mVarField <- newEmptyMVar
-    mVarGameData <- newEmptyMVar
+    gui <- guiNew
     
     let ai = \gameId gameData board time -> (AI.getNextMove board gameData, do
-            tryPutMVar mVarField board
-            tryPutMVar mVarGameData gameData
             PP.prettyPrint board)
     
     forkIO $ do
         let cfg = S.Cfg {
               S.gameId           = gameId'
             , S.player           = player'
-            , S.gameDataComplete = \_ _ -> return ()
-            , S.preAi            = \_ _ _ _ -> return ()
-            , S.ai               = ai
+            , S.gameDataComplete = updateGameData gui
+            , S.preAi            = guiPreAi gui
+            , S.ai               = guiAi gui
             }
         res <- play cfg socket
         case res of
             Right (gameData, winner, board) -> do
-                tryPutMVar mVarField board
-                tryPutMVar mVarGameData gameData
                 PP.prettyPrint board
+                updateBoard gui board
+                
                 case winner of
                      Just winner' -> do
                         let winner'' = (players gameData) ! winner'
                         if itsMe winner''
-                            then putStrLn "You won"
-                            else putStrLn $ (playerName winner'') ++ " won"
+                            then do
+                                putStrLn "You won"
+                                showGuiMsg gui MessageInfo "You won"
+                            else do
+                                putStrLn $ (playerName winner'') ++ " won"
+                                showGuiMsg gui MessageError $ (playerName winner'') ++ " won"
                      Nothing -> do
                          putStrLn "The game ended in a draw"
+                         showGuiMsg gui MessageInfo "The game ended in a draw"
             
             -- Error in game
             Left msg -> do
                 putStrLn msg
+                showGuiMsg gui MessageError msg
         return ()
     
-    GG.createGameGUI mVarField mVarGameData
+    runGui gui
 
 guiMode cfg = do
     initGUI

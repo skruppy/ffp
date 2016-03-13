@@ -13,101 +13,193 @@ import Data.Array
 import Control.Concurrent
 import Control.Concurrent.MVar
 
+data Command
+    = ShowBoard Board
+    | ShowGameData String GameData
+    | ShowMessage MessageType String
 
-createGameGUI :: (MVar (Array (Int, Int) String))-> (MVar GameData) -> IO ()
-createGameGUI mVField  mVGameData = do
-    field <- takeMVar mVField
-    gameData <- takeMVar mVGameData
+
+data Gui = Gui {
+      guiChannel    :: MVar Command
+    , guiWindow     :: Window
+    , guiContBoard  :: Table
+    , guiLbGameType :: Label
+    , guiLbGameName :: Label
+    , guiLbGameId   :: Label
+    , guiLbStatus   :: Label
+    }
+
+
+{-== EXTERNAL ==-}
+guiNew :: IO Gui
+guiNew = do
+    channel <- newEmptyMVar
     
-    let getGameTypeAndName (GameData _ _ gt gn _) = gt ++ " : " ++ gn
-    let title = getGameTypeAndName gameData
     window <- windowNew
-    set window [windowTitle := title, containerBorderWidth := 5,
-                windowDefaultWidth := 500, windowDefaultHeight := 500]
+    set window [ windowTitle          := "Waiting for input"
+               , containerBorderWidth := 5
+               , windowDefaultWidth   := 500
+               , windowDefaultHeight  := 500
+               ]
     
-    let ((_,_),(_,size)) = bounds field
-    layoutTable <- tableNew 2 1 False
+    contWindow <- hBoxNew False 15
+    contBoard  <- tableNew 1 1 True
+    contInfo   <- vBoxNew False 6
+
+    boxPackStart contWindow contBoard PackGrow 0
+    boxPackStart contWindow contInfo PackNatural 0
     
-    -- game field
-    gameTable <- tableNew (size +1) (size +1) True 
-    tableAttachDefaults layoutTable gameTable 0 1 0 1
-    buttons <- createButtons field gameTable
-    addLabels gameTable size
     
-    -- player field
-    playerTable <- tableNew (size+1) 1 True
-    let getNameFromPlayer (PlayerItem s _ itsMe) = if itsMe then ("  <b>" ++ s  ++ "</b>") else s
-    let getPlayername (GameData _ _ _ _ players) n = getNameFromPlayer (players ! n)
-    let playername0 = (getPlayername gameData 0) ++ " ⛂"
-    let playername1 = (getPlayername gameData 1) ++ " ⛀"
-    labelP0 <- labelNew (Just playername0 )
-    labelSetMarkup labelP0 playername0
-    tableAttachDefaults playerTable labelP0 0 1 0 1
-    labelP1 <- labelNew (Just playername1)
-    labelSetMarkup labelP1 playername1
-    tableAttachDefaults playerTable labelP1 0 1 1 2
-    tableAttachDefaults layoutTable playerTable 1 2 0 1
+    lbGameType   <- addSimpleInfo contInfo "Game type"
+    lbGameName   <- addSimpleInfo contInfo "Game name"
+    lbGameId     <- addSimpleInfo contInfo "Game ID"
+    lbGameStatus <- addSimpleInfo contInfo "Game Status"
     
-    containerAdd window layoutTable
-    
+    containerAdd window contWindow
     onDestroy window mainQuit
-    widgetShowAll window
     
-    timeoutAdd ((updateField mVField buttons)>> yield >> return True) 100
-    
+    return Gui {
+          guiChannel    = channel
+        , guiWindow     = window
+        , guiContBoard  = contBoard
+        , guiLbGameType = lbGameType
+        , guiLbGameName = lbGameName
+        , guiLbGameId   = lbGameId
+        , guiLbStatus   = lbGameStatus
+        }
+
+
+runGui :: Gui -> IO ()
+runGui gui = do
+    handler <- timeoutAdd (poll gui) 100
+    widgetShowAll (guiWindow gui)
     mainGUI
+    timeoutRemove handler
 
 
-updateField :: (MVar (Array (Int, Int) String)) -> [Button] -> IO()
-updateField mVField buttons = do
-    maybeNewField <- tryTakeMVar mVField
-    case maybeNewField of
-         Nothing ->  do return ()
-         Just newField -> do
-            let i = indices newField
-            let e = elems newField
-            let makeCool a = if (a == "W") then "⛀" else if (a == "B") then "⛂" else " " 
-            let changeLabel (y:[]) (x:[]) = do (buttonSetLabel x (makeCool y))
-                changeLabel (y:ys) (x:xs) = do (buttonSetLabel x (makeCool y)) >> changeLabel ys xs
-            changeLabel e buttons
+updateGameData :: Gui -> String -> GameData -> IO ()
+updateGameData (Gui {guiChannel = channel}) gameId gameData = do
+    putMVar channel $ ShowGameData gameId gameData
 
 
-createButtons :: (Array (Int, Int) String)-> Table -> IO [Button]
-createButtons field table = do 
-    let fieldIndi = indices field
-    buttons <- mapM (createButton table field) fieldIndi
-    return buttons
+updateBoard :: Gui -> Board -> IO ()
+updateBoard (Gui {guiChannel = channel}) board = do
+    putMVar channel $ ShowBoard board
 
 
-createButton :: Table -> (Array (Int, Int) String) -> (Int,Int) -> IO Button
-createButton table field (r,c) = do 
-    let s = if ((field ! (r,c)) == "W") then "⛀" else if ((field ! (r,c)) == "B") then "⛂" else " " 
-    let ((_,_),(_, size)) = bounds field
-    let r' = r +1
-    let c' = size - c +1
-    button <- buttonNewWithLabel s
-    tableAttachDefaults table button  (r'-1) (r') (c'-1) (c')
-    return button
+showGuiMsg :: Gui -> MessageType -> String -> IO ()
+showGuiMsg (Gui {guiChannel = channel}) msgType msg = do
+    putMVar channel $ ShowMessage msgType msg
 
 
-addLabels :: Table -> Int -> IO ()
-addLabels table size = do
-    let toList 0 = []
-        toList x = x : (toList (x-1))
-    let nums = toList size
-    let labelsNum = map (\y -> show y) nums
-    let labelsAlpha = map (\x -> (['A'..'Z'] !! (x-1):"")) nums
-    let numIndi = map (\x -> (size - x + 1,1)) nums
-    let alphaIndi = map (\x -> (size+1, x +1)) nums
+{-== INTERNAL ==-}
+poll :: Gui -> IO Bool
+poll gui = do
+    msg <- tryTakeMVar $ guiChannel gui
+    maybe (return ()) (update gui) msg
+    return True
+
+
+update :: Gui -> Command -> IO ()
+update gui (ShowGameData gameId (GameData serverMajor serverMinor gameType gameName players)) = do
+    labelSetText (guiLbGameType gui) $ "    " ++ gameType
+    labelSetText (guiLbGameName gui) $ "    " ++ gameName
+    labelSetText (guiLbGameId gui)   $ "    " ++ gameId
+
+
+update gui (ShowBoard board) = do
+    old <- tableGetSize cont
+    case old of
+        (oldX, oldY) | oldX == 1 && oldY == 1 -> do
+            tableResize cont newX newY
+        
+        (oldX, oldY) | oldX /= newX || oldY /= newY -> do
+            error $ "Board dimensions have changed over time " ++ (show old)
+        
+        otherwise -> return ()
+    
+    odlWidgets <- containerGetChildren cont
+    mapM (containerRemove cont) odlWidgets
+    
+    addLabels     cont (newX-1) (newY-1)
+    createButtons cont board
+    widgetShowAll cont
+    where
+        cont = guiContBoard gui
+        bnds = snd $ bounds board
+        newX = 1 + fst bnds
+        newY = 1 + snd bnds
+
+
+update gui (ShowMessage msgType msg) = do
+    window <- messageDialogNew
+        Nothing
+        []
+        msgType
+        ButtonsOk
+        msg
+    
+    window `on` response $ \_ -> do
+        widgetDestroy  window
+    
+    widgetShowAll window
+
+
+addLabels :: Table -> Int -> Int -> IO ()
+addLabels table sizeX sizeY = do
+    let labelsAlpha = map (:[]) $ take sizeX ['A'..'Z']
+    let labelsNum   = map show [1..sizeY]
+    
+    let alphaIndi   = map (\x -> (sizeX+1  ,1+x)) [1..sizeX]
+    let numIndi     = map (\y -> (sizeX+1-y,1  )) [1..sizeY]
+    
     nlabels <- createLabels table numIndi labelsNum
     alabels <- createLabels table alphaIndi labelsAlpha
+    
     return ()
 
 
 createLabels :: Table -> [(Int,Int)] -> [String] -> IO ([Label])
-createLabels _     []    _            = do return []
+createLabels _ [] _ = do return []
 createLabels table coord labelStrings = do
     labels <- mapM labelNew (map Just labelStrings)
     let trippel = zip labels coord
     mapM_ (\(l,(c,r)) -> tableAttachDefaults table l (r-1) r (c-1) c) trippel
     return labels
+
+
+createButtons :: Table -> Board -> IO [Button]
+createButtons table field = do
+    let fieldIndi = indices field
+    buttons <- mapM (createButton table field) fieldIndi
+    return buttons
+
+
+createButton :: Table -> Board -> (Int, Int) -> IO Button
+createButton table field (r,c) = do
+    let s = if ((field ! (r,c)) == "W") then "⛀" else if ((field ! (r,c)) == "B") then "⛂" else " "
+    let ((_,_),(_, size)) = bounds field
+    let r' = r +1
+    let c' = size - c +1
+    button <- buttonNewWithLabel s
+    tableAttachDefaults table button (r'-1) (r') (c'-1) (c')
+    return button
+
+
+addInfoHeader :: VBox -> String -> IO ()
+addInfoHeader container description = do
+    label <- labelNew $ Just ""
+    labelSetMarkup label $ "<b>"++description++"</b>"
+    miscSetAlignment label 0.0 0.5
+    boxPackStart container label PackNatural 0
+
+
+addSimpleInfo :: VBox -> String -> IO Label
+addSimpleInfo container description = do
+    addInfoHeader container description
+    
+    lbValue <- labelNew $ Just "    -"
+    miscSetAlignment lbValue 0.0 0.5
+    boxPackStart container lbValue PackNatural 0
+    
+    return lbValue
