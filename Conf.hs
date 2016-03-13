@@ -14,7 +14,7 @@ data IntermediateCfg = IntermediateCfg
     , conf   :: Maybe String
     , gameId :: Maybe String
     , player :: Maybe Int
-    }
+    } deriving (Eq, Show)
 
 
 defaultCfg = IntermediateCfg

@@ -27,6 +27,8 @@ import System.Environment
 import System.Exit
 import System.IO
 import Util
+import Data.Maybe
+
 
 
 -- The name speaks for it self. Here you are looking at the beautiful main-l↺↺p.
@@ -74,65 +76,57 @@ finalizeCfg IntermediateCfg
         Left msg     -> return $ Left msg
 
 
-getGuiCfg :: Gui -> String -> IO (String, Maybe Int, NS.Socket)
-getGuiCfg gui msg = do
-    -- Get config from GUI
-    cfg <- CG.getCfg gui msg
-    
-    -- Try to make final config
-    res <- finalizeCfg cfg
-    case res of
-        Right finalCfg -> return finalCfg
-        Left  msg      -> getGuiCfg gui msg
-
-
 guiMode cfg = do
-    gui <- CG.createGui cfg
-    (gameId', player', socket) <- getGuiCfg gui ""
-
-    mVarField <- newEmptyMVar
-    mVarGameData <- newEmptyMVar
-    forkIO $ GG.createGameGUI mVarField mVarGameData
+    initGUI
+    cfg' <- CG.getCfg cfg (\cfg' -> finalizeCfg cfg')
+    putStrLn $ show $ cfg'
     
-    let ai = \gameData field time -> (
-            AI.getNextMove field gameData
-          , do
-              tryPutMVar mVarField field
-              tryPutMVar mVarGameData gameData
-              PP.prettyPrint field
-          )
-    
-    res <- play gameId' player' ai socket
-    case res of
-        Right (gameData, winner, board) -> do
-            tryPutMVar mVarField board
-            tryPutMVar mVarGameData gameData
-            PP.prettyPrint board
+    case cfg' of
+        Just (gameId', player', socket) -> do
+            mVarField <- newEmptyMVar
+            mVarGameData <- newEmptyMVar
+            forkIO $ GG.createGameGUI mVarField mVarGameData
             
-            window <- messageDialogNew
-                Nothing
-                []
-                MessageError
-                ButtonsOk
-                "Game over"
+            let ai = \gameData field time -> (
+                    AI.getNextMove field gameData
+                  , do
+                      tryPutMVar mVarField field
+                      tryPutMVar mVarGameData gameData
+                      PP.prettyPrint field
+                  )
             
-            dialogRun window
-            widgetDestroy window
-            
-            return True
-        
-        Left msg -> do
-            window <- messageDialogNew
-                Nothing
-                []
-                MessageError
-                ButtonsOk
-                msg
-            
-            dialogRun window
-            widgetDestroy window
-            
-            return False
+            res <- play gameId' player' ai socket
+            case res of
+                Right (gameData, winner, board) -> do
+                    tryPutMVar mVarField board
+                    tryPutMVar mVarGameData gameData
+                    PP.prettyPrint board
+                    
+                    window <- messageDialogNew
+                        Nothing
+                        []
+                        MessageError
+                        ButtonsOk
+                        "Game over"
+                    
+                    dialogRun window
+                    widgetDestroy window
+                    
+                    return True
+                
+                Left msg -> do
+                    window <- messageDialogNew
+                        Nothing
+                        []
+                        MessageError
+                        ButtonsOk
+                        msg
+                    
+                    dialogRun window
+                    widgetDestroy window
+                    
+                    return False
+        Nothing -> return True
 
 
 consoleMode cfg = do

@@ -12,16 +12,9 @@ import Conf
 import Data.Maybe
 import System.Exit
 import Data.String.Utils
+import Control.Concurrent.MVar
+import Control.Concurrent
 
-
-data Gui = Gui
-    { guiWindow   :: Dialog
-    , guiInHost   :: Entry
-    , guiInPort   :: Entry
-    , guiInGameId :: Entry
-    , guiInPlayer :: Entry
-    , guiLabel    :: Label
-    }
 
 labeledInputNew table row name text = do
     input <- entryNew
@@ -36,11 +29,15 @@ labeledInputNew table row name text = do
     return input
 
 
-foo input = if length text > 0 then Just text else Nothing where text = strip input
+bar input =
+    if length text > 0
+        then Just text
+        else Nothing
+    where text = strip input
 
 
-createGui defaults = do
-    initGUI
+getCfg defaults connect = do
+    result <- newMVar Nothing
     
     window <- dialogNew
     set window [windowTitle := "Funthello", containerBorderWidth := 10]
@@ -65,40 +62,48 @@ createGui defaults = do
     miscSetAlignment label 0.0 0.5
     boxPackStart dialogContainer label PackGrow 0
     
+    spinner <- spinnerNew
+    boxPackStart dialogContainer spinner PackGrow 0
+    
     widgetShowAll window
     dialogSetDefaultResponse window ResponseOk
     
-    return Gui
-        { guiWindow   = window
-        , guiInHost   = inHost
-        , guiInPort   = inPort
-        , guiInGameId = inGameId
-        , guiInPlayer = inPlayer
-        , guiLabel    = label
-        }
+    window `on` response $ \res -> do
+        case res of
+            -- User clicked "cancel"
+            ResponseCancel      -> mainQuit
+            
+            -- User closed the window
+            ResponseDeleteEvent -> mainQuit
+            
+            -- User clicked "Connect"
+            _                   -> do
+                txtHost   <- entryGetText $ inHost
+                txtPort   <- entryGetText $ inPort
+                txtGameId <- entryGetText $ inGameId
+                txtPlayer <- entryGetText $ inPlayer
+                let cfg = IntermediateCfg {
+                      host   = bar txtHost
+                    , port   = bar txtPort
+                    , conf   = Nothing
+                    , gameId = bar txtGameId
+                    , player = (let text = strip txtPlayer in if length text > 0 then Just $ read text else Nothing)
+                    }
 
-
--- https://rosettacode.org/wiki/User_input/Graphical#Haskell
--- https://searchcode.com/codesearch/view/21757632/
-getCfg gui msg = do
-    labelSetMarkup (guiLabel gui) ("<span color=\"red\" weight=\"bold\">"++msg++"</span>")
-    dialogResult <- dialogRun $ guiWindow gui
+                forkIO $ do
+                    res <- connect cfg
+                    case res of
+                        Right something -> do
+                            swapMVar result $ Just something
+                            postGUIAsync $ widgetHide window
+                            postGUIAsync $ mainQuit
+                        Left  msg      -> do
+                            postGUIAsync $ labelSetMarkup label ("<span color=\"red\" weight=\"bold\">"++msg++"</span>")
+                    postGUIAsync $ spinnerStop spinner
+                    postGUIAsync $ widgetSetSensitive btConnect True
+                
+                spinnerStart spinner
+                widgetSetSensitive btConnect False
     
-    dummy <- case dialogResult of
-        ResponseCancel      -> exitSuccess -- User clicked "cancel"
-        ResponseDeleteEvent -> exitSuccess -- User closed the window
-        _ -> return ()
-    
---     widgetHide window
-    
-    txtHost   <- entryGetText $ guiInHost gui
-    txtPort   <- entryGetText $ guiInPort gui
-    txtGameId <- entryGetText $ guiInGameId gui
-    txtPlayer <- entryGetText $ guiInPlayer gui
-    return IntermediateCfg
-        { host   = foo txtHost
-        , port   = foo txtPort
-        , conf   = Nothing
-        , gameId = foo txtGameId
-        , player = (let text = strip txtPlayer in if length text > 0 then Just $ read text else Nothing)
-        }
+    mainGUI
+    takeMVar result
