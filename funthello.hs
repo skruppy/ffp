@@ -13,8 +13,9 @@ import Conf.Gui as CG
 import Control.Concurrent
 import Control.Concurrent.MVar
 import Control.Monad
-import Data.String.Utils
 import Data.Array
+import Data.Maybe
+import Data.String.Utils
 import Data.Version (showVersion)
 import GameGUI as GG
 import Graphics.UI.Gtk
@@ -29,7 +30,6 @@ import System.Environment
 import System.Exit
 import System.IO
 import Util
-import Data.Maybe
 
 
 
@@ -102,12 +102,13 @@ printGameData gameId gameData = do
 
 
 {-== GUI MODE ==-}
+guiPreAi :: Gui -> String -> GameData -> Array (Int, Int) String -> Int -> IO ()
 guiPreAi gui gameId gameData board time = do
     putStrLn $ "Now I can think "++(show time)++"ms about the best move on the following board:"
     prettyPrint board
     updateBoard gui board
 
-
+guiAi :: Gui -> String -> GameData -> Array (Int,Int) String -> Int -> (String, IO () )
 guiAi gui gameId gameData board time =
     (move, do
         putStrLn $ "I decided to do: "++move
@@ -116,6 +117,7 @@ guiAi gui gameId gameData board time =
     where
         move = AI.getNextMove board gameData
 
+startMainGui :: (String, Maybe Int, NS.Socket) -> IO Bool
 startMainGui (gameId', player', socket) = do
     gui <- guiNew
     
@@ -172,7 +174,7 @@ startMainGui (gameId', player', socket) = do
     -- The GUI always exits successfully (to big to fail :)
     return True
 
-
+guiMode :: IntermediateCfg -> IO Bool
 guiMode cfg = do
     -- Init GTK once before any other GTK call
     initGUI
@@ -185,15 +187,16 @@ guiMode cfg = do
 
 
 {-== CONSOLE MODE ==-}
+consoleGameDataComplete :: String -> GameData -> IO ()
 consoleGameDataComplete gameId gameData = do
     printGameData gameId gameData
 
-
+consolePreAi :: String -> GameData -> Array (Int,Int) String -> Int -> IO ()
 consolePreAi gameId gameData board time = do
     putStrLn $ "Now I can think "++(show time)++"ms about the best move on the following board:"
     prettyPrint board
 
-
+consoleAi :: String -> GameData -> Array (Int,Int) String -> Int -> (String ,IO ())
 consoleAi gameId gameData board time =
     (move, do
         putStrLn $ "I decided to do: "++move
@@ -201,6 +204,7 @@ consoleAi gameId gameData board time =
     where
         move = AI.getNextMove board gameData
 
+consoleMode :: IntermediateCfg -> IO Bool
 consoleMode cfg = do
     res <- finalizeCfg cfg
     case res of

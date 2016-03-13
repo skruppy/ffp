@@ -6,10 +6,10 @@
 
 module Net(Net.connect,Net.listen,speak,converse) where
 
-import Network.Socket as NS
 import Control.Exception
-import System.IO
+import Network.Socket as NS
 import System.Console.ANSI
+import System.IO
 
 
 -- *Knock Knock* "Who's there?" "Denial of Service Attack" "Den...?"
