@@ -112,10 +112,11 @@ guiAi :: Gui -> String -> GameData -> Array (Int,Int) String -> Int -> (String, 
 guiAi gui gameId gameData board time =
     (move, do
         putStrLn $ "I decided to do: "++move
-        updateBoard gui board
+        prettyPrint nextBoard
+        updateBoard gui nextBoard
     )
     where
-        move = AI.getNextMove board gameData
+        (move, nextBoard) = AI.getNextMove board gameData
 
 startMainGui :: (String, Maybe Int, NS.Socket) -> IO Bool
 startMainGui (gameId', player', socket) = do
@@ -199,10 +200,11 @@ consolePreAi gameId gameData board time = do
 consoleAi :: String -> GameData -> Array (Int,Int) String -> Int -> (String ,IO ())
 consoleAi gameId gameData board time =
     (move, do
-        putStrLn $ "I decided to do: "++move
+        putStrLn $ "I decided to do: "++move 
+        prettyPrint nextBoard
     )
     where
-        move = AI.getNextMove board gameData
+        (move, nextBoard) = AI.getNextMove board gameData
 
 consoleMode :: IntermediateCfg -> IO Bool
 consoleMode cfg = do

@@ -21,7 +21,7 @@ directions = [
     ( 1,-1) , ( 1, 0) , ( 1, 1)]
 
 searchdepth :: Int
-searchdepth = 5 
+searchdepth = 5
 
 data RNode = RNode
     { gamefield   :: (Array (Int, Int) (Int, String))
@@ -39,12 +39,14 @@ getPlayerColourFromGameData (GameData _ _ _ _ players) = itsMe $ firstItem
         firstItem = players ! 0
 
 
-getNextMove :: (Array (Int, Int) String) -> GameData  -> String
+getNextMove :: (Array (Int, Int) String) -> GameData  -> (String, Board)
 getNextMove field gameData =
-    getMoveFromRNode $ getNextRNode a searchdepth
+    (getMoveFromRNode nextNode, newBoard nextNode)
     where
         pC = getPlayerColourFromGameData gameData
         a  = (RNode (createWeightedArray pC field) pC pC Nothing)
+        nextNode = getNextRNode a searchdepth
+        newBoard (RNode field' _ _ _) = listArray (bounds field') (map snd (elems field'))
 
 
 getNextRNode :: RNode -> Int -> RNode
