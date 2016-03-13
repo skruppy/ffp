@@ -104,7 +104,7 @@ printGameData gameId gameData = do
 {-== GUI MODE ==-}
 guiPreAi gui gameId gameData board time = do
     putStrLn $ "Now I can think "++(show time)++"ms about the best move on the following board:"
-    PP.prettyPrint board
+    prettyPrint board
     updateBoard gui board
 
 
@@ -116,11 +116,8 @@ guiAi gui gameId gameData board time =
     where
         move = AI.getNextMove board gameData
 
-blaa gameId' player' socket = do
+startMainGui (gameId', player', socket) = do
     gui <- guiNew
-    
-    let ai = \gameId gameData board time -> (AI.getNextMove board gameData, do
-            PP.prettyPrint board)
     
     forkIO $ do
         let cfg = S.Cfg {
@@ -130,43 +127,61 @@ blaa gameId' player' socket = do
             , S.preAi            = guiPreAi gui
             , S.ai               = guiAi gui
             }
+        
+        -- Do the game.
         res <- play cfg socket
+        
+        -- Check the result of the game.
         case res of
+            -- The game ended without protocol issues.
             Right (gameData, winner, board) -> do
-                PP.prettyPrint board
+                -- Print the final board
+                prettyPrint board
                 updateBoard gui board
                 
                 case winner of
-                     Just winner' -> do
-                        let winner'' = (players gameData) ! winner'
-                        if itsMe winner''
-                            then do
-                                putStrLn "You won"
-                                showGuiMsg gui MessageInfo "You won"
-                            else do
-                                putStrLn $ (playerName winner'') ++ " won"
-                                showGuiMsg gui MessageError $ (playerName winner'') ++ " won"
-                     Nothing -> do
-                         putStrLn "The game ended in a draw"
-                         showGuiMsg gui MessageInfo "The game ended in a draw"
+                    -- The game ended with a WINNER (and a looser)
+                    Just winnerNr -> do
+                       let winnerRecord = (players gameData) ! winnerNr
+                       
+                       if itsMe winnerRecord
+                           -- We won
+                           then do
+                               let msg = "You won"
+                               putStrLn msg
+                               showGuiMsg gui MessageInfo msg
+                           -- We lost
+                           else do
+                               let msg = (playerName winnerRecord) ++ " won"
+                               putStrLn msg
+                               showGuiMsg gui MessageError msg
+                    
+                    -- The game ended in a DRAW
+                    Nothing -> do
+                        let msg = "The game ended in a draw"
+                        putStrLn msg
+                        showGuiMsg gui MessageInfo msg
             
-            -- Error in game
+            -- ERROR in game. We got some protocol issues.
             Left msg -> do
                 putStrLn msg
                 showGuiMsg gui MessageError msg
-        return ()
     
     runGui gui
+    
+    -- The GUI always exits successfully (to big to fail :)
+    return True
+
 
 guiMode cfg = do
+    -- Init GTK once before any other GTK call
     initGUI
-    cfg' <- CG.getCfg cfg (\cfg' -> finalizeCfg cfg')
     
-    case cfg' of
-        Just (gameId', player', socket) -> do
-            blaa gameId' player' socket
-            return True
-        Nothing -> return True
+    -- Try to get a config from the user via GUI
+    cfg' <- CG.getCfg cfg finalizeCfg
+    
+    -- If we got a valid config, start the main GUI, otherwise return successfully
+    maybe (return True) startMainGui cfg'
 
 
 {-== CONSOLE MODE ==-}
@@ -176,7 +191,7 @@ consoleGameDataComplete gameId gameData = do
 
 consolePreAi gameId gameData board time = do
     putStrLn $ "Now I can think "++(show time)++"ms about the best move on the following board:"
-    PP.prettyPrint board
+    prettyPrint board
 
 
 consoleAi gameId gameData board time =
@@ -197,19 +212,34 @@ consoleMode cfg = do
                 , S.preAi            = consolePreAi
                 , S.ai               = consoleAi
                 }
+                
+            -- Do the game.
             res <- play cfg' socket
             
+            -- Check the result of the game.
             case res of
+                -- The game ended without protocol issues.
                 Right (gameData, winner, board) -> do
-                    PP.prettyPrint board
+                    -- Print the final board
+                    prettyPrint board
+                    
                     case winner of
-                         Just winner' -> do
-                            let winner'' = (players gameData) ! winner'
-                            if itsMe winner''
+                        -- The game ended with a WINNER (and a looser)
+                        Just winnerNr -> do
+                            let winnerRecord = (players gameData) ! winnerNr
+                            
+                            if itsMe winnerRecord
+                                -- We won
                                 then putStrLn "You won"
-                                else putStrLn $ (playerName winner'') ++ " won"
-                         Nothing -> do
-                             putStrLn "The game ended in a draw"
+                                
+                                -- We lost
+                                else putStrLn $ (playerName winnerRecord) ++ " won"
+                        
+                        -- The game ended in a DRAW
+                        Nothing -> do
+                            putStrLn "The game ended in a draw"
+                    
+                    -- Exit successfully
                     return True
                 
                 -- Error in game
