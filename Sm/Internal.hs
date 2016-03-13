@@ -62,16 +62,18 @@ data State
       deriving (Eq, Show)
 
 data Cfg = Cfg
-    { gameId :: String
-    , player :: Maybe Int
-    , ai     :: GameData -> Board -> Int -> ( String , IO () )
+    { gameId           :: String
+    , player           :: Maybe Int
+    , gameDataComplete :: GameData -> IO ()
+    , preAi            :: GameData -> Board -> Int -> IO ()
+    , ai               :: GameData -> Board -> Int -> ( String , IO () )
     }
 
 instance Show Cfg where
-    show (Cfg gameId player _) = "Cfg " ++ (show gameId) ++ " " ++ (show player)
+    show (Cfg gameId player _ _ _) = "Cfg " ++ (show gameId) ++ " " ++ (show player)
 
 instance Eq Cfg where
-    (Cfg gameId1 player1 _) == (Cfg gameId2 player2 _) = gameId1 == gameId2 && player1 == player2
+    (Cfg gameId1 player1 _ _ _) == (Cfg gameId2 player2 _ _ _) = gameId1 == gameId2 && player1 == player2
 
 data PlayerItem = PlayerItem
     { playerName :: String
@@ -175,7 +177,7 @@ parseInput (PlayerLineState major minor gameType gameName players playerCnt) cfg
 
 parseInput (PlayerEndState major minor gameType gameName players) cfg input =
     if input == "+ ENDPLAYERS"
-       then (IdleState gameData, [], return ())
+       then (IdleState gameData, [], gameDataComplete cfg gameData)
        else unexpectedInput "end of oponent list" input
     where
         gameData = GameData
@@ -242,7 +244,7 @@ parseInput (FieldLineState gameData boardTransReason x y curY field) cfg input =
 parseInput (FieldEndState gameData boardTransReason x y field) cfg input =
     if input == "+ ENDFIELD" then
         case boardTransReason of
-            Move time     -> (ThinkingState gameData time f      , ["THINKING"] , return ())
+            Move time     -> (ThinkingState gameData time f      , ["THINKING"] , preAi cfg gameData f time)
             Winner winner -> (QuitState gameData (Just winner) f , []           , return ())
             Draw          -> (QuitState gameData (Nothing)     f , []           , return ())
     else unexpectedInput "end of board" input
@@ -250,12 +252,12 @@ parseInput (FieldEndState gameData boardTransReason x y field) cfg input =
         f = listArray ((1,1), (x,y)) (concat $ transpose field)
 
 
-parseInput (ThinkingState gameData boardTransReason field) cfg input =
+parseInput (ThinkingState gameData time field) cfg input =
     if input == "+ OKTHINK"
        then (MoveState gameData, ["PLAY "++move], io)
        else unexpectedInput "OKTHINK" input
     where
-        (move, io) = ai cfg gameData field boardTransReason
+        (move, io) = ai cfg gameData field time
 
 
 parseInput (MoveState gameData) cfg input =

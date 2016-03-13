@@ -43,17 +43,14 @@ import Data.Maybe
     (↺) hdl s'
 
 
-play gameId' player' ai socket = do
+play :: Cfg -> NS.Socket -> IO (Either String (GameData, Maybe Int, Board))
+play cfg socket = do
     -- Convert socket to unbuffered handle
     hdl <- socketToHandle socket ReadWriteMode
     hSetBuffering hdl NoBuffering
     
     -- Main loop
-    res <- (↺) hdl $ smCreate S.Cfg {
-          S.gameId = gameId'
-        , S.player = player'
-        , S.ai     = ai
-        }
+    res <- (↺) hdl $ smCreate cfg
     
     -- So close!
     hClose hdl
@@ -77,6 +74,7 @@ finalizeCfg IntermediateCfg
         Left msg     -> return $ Left msg
 
 
+{-== CONSOLE MODE ==-}
 blaa gameId' player' socket = do
     mVarField <- newEmptyMVar
     mVarGameData <- newEmptyMVar
@@ -87,7 +85,14 @@ blaa gameId' player' socket = do
             PP.prettyPrint board)
     
     forkIO $ do
-        res <- play gameId' player' ai socket
+        let cfg = S.Cfg {
+              S.gameId           = gameId'
+            , S.player           = player'
+            , S.gameDataComplete = \_ -> return ()
+            , S.preAi            = \_ _ _ -> return ()
+            , S.ai               = ai
+            }
+        res <- play cfg socket
         case res of
             Right (gameData, winner, board) -> do
                 tryPutMVar mVarField board
@@ -120,12 +125,31 @@ guiMode cfg = do
         Nothing -> return True
 
 
+{-== CONSOLE MODE ==-}
+consolePreAi gameData board time = do
+    putStrLn $ "Now I can think "++(show time)++"ms about the best move on the following board:"
+    PP.prettyPrint board
+
+
+consoleAi gameData board time =
+    (move, do
+        putStrLn $ "I decided to do: "++move
+    )
+    where
+        move = AI.getNextMove board gameData
+
 consoleMode cfg = do
     res <- finalizeCfg cfg
     case res of
         Right (gameId', player', socket) -> do
-            let ai = \gameData board time -> ((AI.getNextMove board gameData) , PP.prettyPrint board)
-            res <- play gameId' player' ai socket
+            let cfg' = S.Cfg {
+                  S.gameId           = gameId'
+                , S.player           = player'
+                , S.gameDataComplete = \_ -> return ()
+                , S.preAi            = consolePreAi
+                , S.ai               = consoleAi
+                }
+            res <- play cfg' socket
             
             case res of
                 Right (gameData, winner, board) -> do

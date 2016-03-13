@@ -11,7 +11,13 @@ import Sm.Internal
 import Data.Array
 
 testAi gameData field time = ("test" , return ())
-cfg = Cfg {gameId = "GameId", player = Just 1, ai = testAi}
+cfg = Cfg
+    { gameId           = "GameId"
+    , player           = Just 1
+    , gameDataComplete = \_ -> return ()
+    , preAi            = \_ _ _ -> return ()
+    , ai               = testAi
+    }
 
 testPlayers = array (0, 1) [
     (0, Just PlayerItem {playerName = "Hans Peter" , isReady = True , itsMe = True }),
@@ -75,7 +81,7 @@ main = hspec $ do
             parseInput (VersionState 1 23) cfg "+ Client version accepted - please send Game-ID to join" `stateShouldBe` (GameKindState 1 23, ["ID GameId"])
         
         it "Valid input (different game id)" $ do
-            parseInput (VersionState 1 23) (Cfg {gameId = "asd", player = Just 1, ai = testAi}) "+ Client version accepted - please send Game-ID to join" `stateShouldBe` (GameKindState 1 23, ["ID asd"])
+            parseInput (VersionState 1 23) (cfg {gameId = "asd"}) "+ Client version accepted - please send Game-ID to join" `stateShouldBe` (GameKindState 1 23, ["ID asd"])
         
         it "Inalid input (random)" $ do
             parseInput (VersionState 1 23) cfg "+ asd" `stateShouldBe` (ErrorState "Protocoll error: Expected client version to be accepted, but got \"+ asd\"", [])
@@ -97,13 +103,13 @@ main = hspec $ do
     
     describe "Parsing in game kind state (+ ?)" $ do
         it "Valid input (one-digit player number)" $ do
-            parseInput (GameNameState 1 23 "Reversi") (Cfg {gameId = "GameId", player = Just 1, ai = testAi}) "+ Game name" `stateShouldBe` (PlayerNameState 1 23 "Reversi" "Game name", ["PLAYER 1"])
+            parseInput (GameNameState 1 23 "Reversi") (cfg {player = Just 1}) "+ Game name" `stateShouldBe` (PlayerNameState 1 23 "Reversi" "Game name", ["PLAYER 1"])
         
         it "Valid input (two-digit player number)" $ do
-            parseInput (GameNameState 1 23 "Reversi") (Cfg {gameId = "GameId", player = Just 42, ai = testAi}) "+ Game name" `stateShouldBe` (PlayerNameState 1 23 "Reversi" "Game name", ["PLAYER 42"])
+            parseInput (GameNameState 1 23 "Reversi") (cfg {player = Just 42}) "+ Game name" `stateShouldBe` (PlayerNameState 1 23 "Reversi" "Game name", ["PLAYER 42"])
         
         it "Valid input (no player number)" $ do
-            parseInput (GameNameState 1 23 "Reversi") (Cfg {gameId = "GameId", player = Nothing, ai = testAi}) "+ Game name" `stateShouldBe` (PlayerNameState 1 23 "Reversi" "Game name", ["PLAYER"])
+            parseInput (GameNameState 1 23 "Reversi") (cfg {player = Nothing}) "+ Game name" `stateShouldBe` (PlayerNameState 1 23 "Reversi" "Game name", ["PLAYER"])
         
         it "Invalid input (missing game name)" $ do
             parseInput (GameNameState 1 23 "Reversi") cfg  "+ " `stateShouldBe` (ErrorState "Protocoll error: Expected game name, but got \"+ \"", [])
