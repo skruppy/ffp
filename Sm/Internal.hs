@@ -89,11 +89,11 @@ data GameData = GameData
     , players     :: Array Int PlayerItem
     } deriving (Eq, Show)
 
-unexpectedInput :: [Char] -> String -> (State, [a], IO ())
+unexpectedInput :: [Char] -> String -> (State, [String], IO ())
 unexpectedInput expected ('-':input) = (ErrorState ("Server error:"++input++" (expected "++expected++")"), [], return ())
 unexpectedInput expected (input)     = (ErrorState ("Protocoll error: Expected "++expected++", but got \""++input++"\""), [], return ())
 
-constraintError :: String -> String -> (State, [a], IO())
+constraintError :: String -> String -> (State, [String], IO())
 constraintError msg input = (ErrorState (msg++". Caussed by \""++input++"\""), [], return ())
 
 parseInput :: State -> Cfg -> String-> (State, [String], IO ())
