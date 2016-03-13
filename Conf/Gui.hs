@@ -56,7 +56,7 @@ getCfg defaults connect = do
     inHost   <- labeledInputNew grid 2 "Ho_stname"  (fromMaybe "" $ host defaults)
     inPort   <- labeledInputNew grid 3 "_Port"      (fromMaybe "" $ port defaults)
     
-    label <- labelNew Nothing
+    label <- labelNew Just ""
     labelSetJustify label JustifyLeft
     labelSetLineWrap label True
     miscSetAlignment label 0.0 0.5
