@@ -6,9 +6,9 @@
 
 module Main where
 
-import Test.Hspec
-import Sm.Internal
 import Data.Array
+import Sm.Internal
+import Test.Hspec
 
 testAi gameId gameData field time = ("test" , return ())
 cfg = Cfg

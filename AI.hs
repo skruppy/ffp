@@ -6,9 +6,9 @@
 
 module AI where
 
-import Data.Tree.Game_tree.Negascout as NS
-import Data.Tree.Game_tree.Game_tree
 import Data.Array
+import Data.Tree.Game_tree.Game_tree
+import Data.Tree.Game_tree.Negascout as NS
 import Sm
 
 alphabet :: [Char]

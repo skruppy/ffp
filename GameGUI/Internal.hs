@@ -6,12 +6,12 @@
 
 module GameGUI.Internal where
 
+import Control.Concurrent
+import Control.Concurrent.MVar
+import Data.Array
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.Display.Label
 import Sm
-import Data.Array
-import Control.Concurrent
-import Control.Concurrent.MVar
 
 data Command
     = ShowBoard Board

@@ -6,14 +6,14 @@
 
 module Conf.Gui where
 
-import Graphics.UI.Gtk
-import Util
 import Conf
-import Data.Maybe
-import System.Exit
-import Data.String.Utils
-import Control.Concurrent.MVar
 import Control.Concurrent
+import Control.Concurrent.MVar
+import Data.Maybe
+import Data.String.Utils
+import Graphics.UI.Gtk
+import System.Exit
+import Util
 
 
 labeledInputNew table row name text = do

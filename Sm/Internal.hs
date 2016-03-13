@@ -7,12 +7,12 @@
 module Sm.Internal where
 
 import Data.Array
+import Data.Ix
 import Data.List
 import Data.Maybe
-import Text.Regex.Posix
-import Data.Ix
-import Paths_funthello (version)
 import Data.Version
+import Paths_funthello (version)
+import Text.Regex.Posix
 
 
 data StepResult
