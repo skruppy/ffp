@@ -111,7 +111,11 @@ guiPreAi gui gameId gameData board time = do
 
 guiAi :: Gui -> String -> GameData -> Array (Int,Int) String -> Int -> (String, IO () )
 guiAi gui gameId gameData board time =
-    (move, putStrLn $ "I decided to do: "++move)
+    (move, do 
+            putStrLn $ "I decided to do: "++move
+            prettyPrint nextBoard
+            updateBoard gui nextBoard
+    )
     where
         (move, nextBoard) = AI.getNextMove board gameData
 
@@ -200,7 +204,10 @@ consolePreAi gameId gameData board time = do
 
 consoleAi :: String -> GameData -> Array (Int,Int) String -> Int -> (String ,IO ())
 consoleAi gameId gameData board time =
-    (move, putStrLn $ "I decided to do: "++move)
+    (move, do
+        putStrLn $ "I decided to do: "++move
+        prettyPrint nextBoard
+    )
     where
         (move, nextBoard) = AI.getNextMove board gameData
 

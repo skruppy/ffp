@@ -93,12 +93,14 @@ makeChildrenFromMoves (x:xs) field pC pT = (RNode (makeNewField x pT pC field) p
 
 
 makeNewField :: (Int,Int) -> String -> String -> (Array (Int,Int) (Int,String)) -> (Array (Int,Int) (Int,String))
-makeNewField i pT pC field = field // changes
+makeNewField i pT pC field = field // ((i, (pValue,pT)):changes)
     where
         changes = splitToChanges directions i $ map (lookInDirectionFrom field pT i) directions
         splitToChanges _ _ [] = []
         splitToChanges (y:ys)(r,c)(0:xs) = splitToChanges ys (r,c) xs
-        splitToChanges ((dr,dc):ys)(r,c)(x:xs) = ((r+dr*x,c+dc*x), (head (makeElemList pC [pT]))) : splitToChanges ((dr,dc):ys)(r,c)((x-1):xs)
+        splitToChanges ((dr,dc):ys)(r,c)(x:xs) = ((r+dr*x,c+dc*x), (pValue,pT)): splitToChanges ((dr,dc):ys)(r,c)((x-1):xs)
+        pValue :: Int
+        pValue = if (pT == pC) then 1 else (-1)
 
 
 getValidMoves :: (Array (Int,Int) (Int,String)) -> String -> [(Int, Int)]
