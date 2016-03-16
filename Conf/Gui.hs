@@ -15,7 +15,7 @@ import Graphics.UI.Gtk
 import System.Exit
 import Util
 
-
+labeledInputNew :: Table -> Int -> String -> String -> IO Entry
 labeledInputNew table row name text = do
     input <- entryNew
     entrySetText input text
@@ -28,14 +28,14 @@ labeledInputNew table row name text = do
     
     return input
 
-
+bar :: String -> Maybe String
 bar input =
     if length text > 0
         then Just text
         else Nothing
     where text = strip input
 
-
+getCfg :: IntermediateCfg -> (IntermediateCfg -> IO (Either [Char] (String, Maybe Int, s))) -> IO (Maybe (String, Maybe Int, s))
 getCfg defaults connect = do
     result <- newMVar Nothing
     
